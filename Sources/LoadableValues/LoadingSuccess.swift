@@ -44,4 +44,3 @@ extension LoadingSuccess: Hashable where Value: Hashable {}
 extension LoadingSuccess: Decodable where Value: Decodable {}
 extension LoadingSuccess: Encodable where Value: Encodable {}
 extension LoadingSuccess: Sendable where Value: Sendable {}
-

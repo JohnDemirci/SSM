@@ -221,6 +221,52 @@ struct LoadableValuesTests {
         
         #expect(originalValue == decodedValue)
     }
+
+    @Test("Loadable value mapping a loaded value into another one")
+    func testMappingLoadableValueAtLoadedState() {
+        let date = Date()
+        let value: Int = 5
+
+        let loadableValueInt: LoadableValue<Int, TestError> = .loaded(
+            LoadingSuccess<Int>(value: value, timestamp: date)
+        )
+
+        let loadableValueString = loadableValueInt.map {
+            String($0)
+        }
+
+        #expect(loadableValueString.value == String(value))
+    }
+
+    @Test(
+        "Using map on a LoadableValue without the loaded state returns the same state with different value generic",
+        arguments: [
+            LoadableValue<Int, Error>.loading,
+            LoadableValue<Int, Error>.idle,
+            LoadableValue<Int, Error>.cancelled(.now),
+            LoadableValue<Int, Error>.failed(.init(failure: "", timestamp: .now))
+        ]
+    )
+    func loadableValueMapWithOtherStates(_ state: LoadableValue<Int, Error>) async throws {
+        let loadableValueString: LoadableValue<String, Error> = state.map {
+            String($0)
+        }
+
+        #expect(loadableValueString.value == nil)
+
+        switch state {
+        case .idle:
+            #expect(loadableValueString == .idle)
+        case .loading:
+            #expect(loadableValueString == .loading)
+        case .loaded:
+            #expect(Bool(false))
+        case .failed(let failure):
+            #expect(loadableValueString == .failed(failure))
+        case .cancelled(let date):
+            #expect(loadableValueString == .cancelled(date))
+        }
+    }
 }
 
 enum TestError: Error, Equatable, Hashable, Codable {

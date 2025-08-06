@@ -38,7 +38,6 @@ import OSLog
 /// // Handle failure
 /// userProfile = .failed(LoadingFailure(failure: error, timestamp: Date()))
 /// ```
-@frozen
 public enum LoadableValue<Value: Sendable, Failure: Error>: Sendable {
     case cancelled(Date)
     case failed(LoadingFailure<Failure>)
@@ -92,6 +91,11 @@ public extension LoadableValue {
         guard case let .failed(error) = self else { return nil }
         return error.failure
     }
+
+    @inlinable
+    var isFailure: Bool {
+        self.failure != nil
+    }
 }
 
 public extension LoadableValue {
@@ -115,6 +119,7 @@ public extension LoadableValue {
     ///     items.append("item2")
     /// }
     /// ```
+    @inlinable
     mutating func modify(transform: (inout Value) -> Void) {
         switch self {
         case let .loaded(success):

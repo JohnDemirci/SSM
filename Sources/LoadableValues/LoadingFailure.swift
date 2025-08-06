@@ -26,7 +26,7 @@ public struct LoadingFailure<Failure: Error> {
     public let failure: Failure
 
     /// The timestamp when the loading operation failed.
-    let timestamp: Date
+    public let timestamp: Date
 
     /// Creates a new `LoadingFailure` instance with the specified error and timestamp.
     ///

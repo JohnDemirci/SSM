@@ -56,9 +56,56 @@ import LoadableValues
 /// ```
 @MainActor
 public protocol Reducer: Sendable {
+    /// The type representing the state managed by this reducer.
+    ///
+    /// `State` holds all relevant data that describes the current condition
+    /// of the feature or domain managed by the reducer. All state mutations
+    /// in response to requests or broadcast messages are performed on this type.
+    ///
+    /// - Note: `State` should be a value type (typically a struct) to ensure
+    ///   predictable and testable state management.
     associatedtype State
+
+    /// The type representing the requests or actions that can modify the state.
+    ///
+    /// `Request` defines all the possible actions, user intents, or events that
+    /// this reducer can handle to trigger state transitions or side effects.
+    /// Typically modeled as an enum, each case represents a distinct action or
+    /// event relevant to the feature or domain managed by the reducer.
+    ///
+    /// - Note: Defining requests as an enum encourages exhaustiveness and clarity,
+    ///   making it easier to reason about all possible state transitions.
     associatedtype Request
+
+    /// The type representing the environment dependencies for this reducer.
+    ///
+    /// `Environment` encapsulates all external dependencies, services, and clients
+    /// required by the reducer to perform its work. This can include API clients,
+    /// local data stores, configuration objects, or any other state-independent
+    /// collaborators needed by the reducer's logic.
+    ///
+    /// By grouping dependencies into an `Environment` type, you achieve:
+    /// - Decoupling of business logic from concrete implementation details
+    /// - Easier testing and mocking of dependencies
+    /// - More explicit, testable, and maintainable code
+    ///
+    /// - Note: `Environment` should conform to `Sendable` to ensure safe usage in
+    ///   concurrent contexts and avoid data races.
     associatedtype Environment: Sendable
+
+    /// Handles broadcast messages received by the store.
+    ///
+    /// This method is called whenever a broadcast message conforming to `BroadcastMessage`
+    /// is received by the store. Implement this method to respond to cross-cutting events
+    /// or global notifications that may affect the state or trigger side effects in the reducer.
+    ///
+    /// - Parameters:
+    ///   - message: The broadcast message received, conforming to `BroadcastMessage`.
+    ///   - store: The store instance managing the state for this reducer.
+    ///
+    /// You can override this method in your reducer to handle specific broadcast messages.
+    /// The default implementation does nothing.
+    func didReceiveBroadcastMessage(_ message: any BroadcastMessage, in store: Store<Self>) async
 
     /// The main entry point for processing requests and updating state.
     ///
@@ -85,6 +132,17 @@ public protocol Reducer: Sendable {
 }
 
 extension Reducer {
+    public func didReceiveBroadcastMessage(_ message: any BroadcastMessage, in store: Store<Self>) async {}
+}
+
+extension Reducer where Request == Void {
+    public func reduce(
+        store: Store<Self>,
+        request: Request
+    ) async {}
+}
+
+public extension Reducer {
     /// Performs asynchronous work and updates the state at the specified key path.
     ///
     /// This method executes the provided work closure with the environment and
@@ -346,5 +404,24 @@ extension Reducer {
         _ transform: @escaping (inout Value) -> Void
     ) {
         transform(&store.state[keyPath: keypath])
+    }
+
+    /// Broadcasts a message to all interested subscribers in the system.
+    ///
+    /// Use this method to send a message conforming to `BroadcastMessage` to the
+    /// global broadcast studio. This enables decoupled communication between
+    /// stores, reducers, or other components that are listening for broadcast messages.
+    ///
+    /// - Parameter message: A message conforming to `BroadcastMessage` to be broadcast.
+    ///
+    /// Example usage:
+    /// ```swift
+    /// broadcast(UserDidSignOut())
+    /// ```
+    ///
+    /// - Important: Use broadcasts for cross-cutting concerns or global events that
+    ///   should be handled by multiple, potentially unrelated, parts of the system.
+    func broadcast<M: BroadcastMessage>(_ message: M) {
+        BroadcastStudio.shared.publish(message)
     }
 }

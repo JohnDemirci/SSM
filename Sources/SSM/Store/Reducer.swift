@@ -163,7 +163,7 @@ public extension Reducer {
     func perform<T>(
         store: Store<Self>,
         keyPath: WritableKeyPath<State, T>,
-        work: @Sendable @escaping (Environment) async -> T
+        work: @Sendable @escaping (Environment) async -> sending T
     ) async {
         await store.performAsync(keyPath: keyPath, work: work)
     }
@@ -192,7 +192,7 @@ public extension Reducer {
         store: Store<Self>,
         keyPath: WritableKeyPath<State, StateValue>,
         work: @Sendable @escaping (Environment) async -> ClientValue,
-        map transform: @escaping (ClientValue) -> StateValue
+        map transform: @Sendable @escaping (ClientValue) -> StateValue
     ) async {
         await store.performAsync(keyPath: keyPath, work: work, map: transform)
     }
@@ -351,7 +351,7 @@ public extension Reducer {
     func withEnvironment<Dependency: Sendable, Value>(
         store: Store<Self>,
         keyPath: KeyPath<Environment, Dependency>,
-        _ body: @escaping (Dependency) async -> Value
+        _ body: @escaping (Dependency) async -> sending Value
     ) async -> Value {
         return await body(store.environment[keyPath: keyPath])
     }

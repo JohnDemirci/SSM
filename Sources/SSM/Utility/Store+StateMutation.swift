@@ -61,7 +61,7 @@ extension Store {
 extension Store {
     func performAsync<T>(
         keyPath: WritableKeyPath<State, T>,
-        work: @Sendable @escaping (Environment) async -> T
+        work: @Sendable @escaping (Environment) async -> sending T
     ) async {
         let taskKey = String(describing: keyPath)
         defer {
@@ -249,7 +249,7 @@ extension Store {
 
     func withEnvironment<Dependency: Sendable, Value>(
         keyPath: KeyPath<Environment, Dependency>,
-        _ body: @escaping (Dependency) async -> Value
+        _ body: @escaping (Dependency) async -> sending Value
     ) async -> Value {
         return await body(environment[keyPath: keyPath])
     }

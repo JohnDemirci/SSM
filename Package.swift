@@ -1,17 +1,18 @@
-// swift-tools-version: 6.2
+// swift-tools-version: 6.1
 // The swift-tools-version declares the minimum version of Swift required to build this package.
 
 import PackageDescription
 
 let package = Package(
     name: "SSM",
-    platforms: [
-        .macOS(.v26),
-        .iOS(.v26),
-        .watchOS(.v26),
-        .visionOS(.v26),
-        .tvOS(.v26),
-    ],
+	platforms: [
+		.macOS(.v14),
+		.iOS(.v17),
+		.tvOS(.v17),
+		.watchOS(.v9),
+		.visionOS(.v1),
+		.driverKit(.v21)
+	],
     products: [
         .library(
             name: "SSM",

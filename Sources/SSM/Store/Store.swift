@@ -42,7 +42,7 @@ import SwiftUI
 @MainActor
 @dynamicMemberLookup
 @Observable
-public final class Store<R: Reducer>: @MainActor StoreProtocol, Sendable, Identifiable {
+public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, Identifiable {
     public typealias State = R.State
     public typealias Request = R.Request
     public typealias Environment = R.Environment
@@ -51,9 +51,11 @@ public final class Store<R: Reducer>: @MainActor StoreProtocol, Sendable, Identi
     internal let reducer: R
 
     @ObservationIgnored
+	nonisolated(unsafe)
     internal var activeTasks: [String: Task<Void, Never>] = [:]
 
     @ObservationIgnored
+	nonisolated(unsafe)
     private var broadcastCancellable: AnyCancellable?
 
     /// The current feature state held by the store.
@@ -82,7 +84,7 @@ public final class Store<R: Reducer>: @MainActor StoreProtocol, Sendable, Identi
     init(
         initialState: State,
         id: ReferenceIdentifier,
-        environment: Environment,
+        environment: Environment
     ) {
         self.state = initialState
         self.environment = environment
@@ -112,7 +114,6 @@ public final class Store<R: Reducer>: @MainActor StoreProtocol, Sendable, Identi
         )
     }
 
-    @MainActor
     deinit {
         broadcastCancellable = nil
         for task in activeTasks.values {

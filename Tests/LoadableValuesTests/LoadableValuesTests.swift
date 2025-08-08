@@ -267,6 +267,20 @@ struct LoadableValuesTests {
             #expect(loadableValueString == .cancelled(date))
         }
     }
+
+	@Test("why is this not working")
+	func zipMultipleLoadableValues() async throws {
+		let state1: LoadableValue<Int, Error> = .idle
+		let state2: LoadableValue<String, Error> = .loading
+		let zipped = zipped(state1, state2)
+
+		switch zipped {
+		case .idle:
+			#expect(Bool(true))
+		default:
+			#expect(Bool(false))
+		}
+	}
 }
 
 enum TestError: Error, Equatable, Hashable, Codable {

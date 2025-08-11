@@ -63,8 +63,8 @@ extension StoreDebugContext {
     @discardableResult
     public func broadcast<M: BroadcastMessage>(
         _ message: M
-    ) -> StoreDebugContext<R> {
-        BroadcastStudio.shared.publish(message)
+    ) async -> StoreDebugContext<R> {
+        await BroadcastStudio.shared.publish(message)
         return self
     }
 

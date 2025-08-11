@@ -421,7 +421,7 @@ public extension Reducer {
     ///
     /// - Important: Use broadcasts for cross-cutting concerns or global events that
     ///   should be handled by multiple, potentially unrelated, parts of the system.
-    func broadcast<M: BroadcastMessage>(_ message: M) {
-        BroadcastStudio.shared.publish(message)
+    func broadcast<M: BroadcastMessage>(_ message: M) async {
+        await BroadcastStudio.shared.publish(message)
     }
 }

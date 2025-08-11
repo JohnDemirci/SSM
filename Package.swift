@@ -24,10 +24,16 @@ let package = Package(
             targets: ["LoadableValues"]
         ),
     ],
+    dependencies: [
+        .package(url: "https://github.com/apple/swift-async-algorithms", from: "1.0.0"),
+    ],
     targets: [
         .target(
             name: "SSM",
-            dependencies: ["LoadableValues"]
+            dependencies: [
+                "LoadableValues",
+                .product(name: "AsyncAlgorithms", package: "swift-async-algorithms"),
+            ]
         ),
         .target(name: "LoadableValues"),
         .testTarget(

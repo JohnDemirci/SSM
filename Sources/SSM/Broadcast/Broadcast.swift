@@ -5,21 +5,16 @@
 //  Created by John Demirci on 7/13/25.
 //
 
-import Combine
+import AsyncAlgorithms
 import Foundation
 
 @MainActor
 final class BroadcastStudio {
     static let shared = BroadcastStudio()
+    internal let channel = AsyncChannel<any BroadcastMessage>()
 
-    private let subject = PassthroughSubject<any BroadcastMessage, Never>()
-
-    var broadcast: AnyPublisher<any BroadcastMessage, Never> {
-        subject.eraseToAnyPublisher()
-    }
-
-    func publish<M: BroadcastMessage>(_ message: M) {
-        subject.send(message)
+    func publish<M: BroadcastMessage>(_ message: M) async {
+        await channel.send(message)
     }
 }
 

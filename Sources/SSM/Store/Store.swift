@@ -56,7 +56,7 @@ public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, I
 
     @ObservationIgnored
     nonisolated(unsafe)
-    private var broadcastTask: Task<Void, Never>?
+    internal var broadcastCancellable: AnyCancellable?
 
     /// The current feature state held by the store.
     ///
@@ -91,23 +91,32 @@ public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, I
         self.id = id
         self.reducer = .init()
 
-        self.broadcastTask = Task { [weak self] in
-            // Create a local reference to avoid repeated weak unwrapping
-            guard let self else { return }
-
-            for await message in BroadcastStudio.shared.channel {
-                // Check if self still exists and task isn't cancelled
-                guard !Task.isCancelled else {
-                    print("Breaking from broadcast loop - store deallocated or task cancelled")
-                    break
+        self.broadcastCancellable = BroadcastStudio.shared.publisher.sink(
+            receiveCompletion: { [weak self] completion in
+                guard let self else { return }
+                switch completion {
+                case .finished:
+                    self.broadcastCancellable = nil
+                case .failure(let error):
+                    #if DEBUG
+                    assertionFailure("should enver reach here")
+                    #else
+                    dump("unexpected error has been encountered")
+                    #endif
                 }
-                await self.reducer.didReceiveBroadcastMessage(message, in: self)
+            },
+            receiveValue: { [weak self] message in
+                guard let self else { return }
+
+                Task { @MainActor in
+                    await self.reducer.didReceiveBroadcastMessage(message, in: self)
+                }
             }
-        }
+        )
     }
 
     deinit {
-        broadcastTask?.cancel()
+        broadcastCancellable = nil
         for task in activeTasks.values {
             task.cancel()
         }

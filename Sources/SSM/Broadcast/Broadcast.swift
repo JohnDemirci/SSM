@@ -5,26 +5,20 @@
 //  Created by John Demirci on 7/13/25.
 //
 
-import AsyncAlgorithms
+import Combine
 import Foundation
 
 @MainActor
 final class BroadcastStudio {
     static let shared = BroadcastStudio()
+    private let subject = PassthroughSubject<any BroadcastMessage, Never>()
 
-    private var continuation: AsyncStream<any BroadcastMessage>.Continuation?
-    private(set) lazy var channel: AsyncStream<any BroadcastMessage> = {
-        AsyncStream { continuation in
-            self.continuation = continuation
-        }
-    }()
-
-    func publish<M: BroadcastMessage>(_ message: M) {
-        continuation?.yield(message)
+    internal var publisher: AnyPublisher<any BroadcastMessage, Never> {
+        subject.eraseToAnyPublisher()
     }
 
-    deinit {
-        continuation?.finish()
+    func publish<M: BroadcastMessage>(_ message: M) {
+        subject.send(message)
     }
 }
 

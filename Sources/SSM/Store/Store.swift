@@ -54,6 +54,10 @@ public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, I
 	nonisolated(unsafe)
     internal var activeTasks: [String: Task<Void, Never>] = [:]
 
+    @ObservationIgnored
+    nonisolated(unsafe)
+    private var broadcastTask: Task<Void, Never>?
+
     /// The current feature state held by the store.
     ///
     /// This property represents the source of truth for all state managed by the store. It is observed for changes and exposed via dynamic member lookup,
@@ -87,7 +91,7 @@ public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, I
         self.id = id
         self.reducer = .init()
 
-        Task { [weak self] in
+        self.broadcastTask = Task { [weak self] in
             guard let self else { return }
             for await message in BroadcastStudio.shared.channel {
                 await self.reducer.didReceiveBroadcastMessage(message, in: self)
@@ -96,6 +100,7 @@ public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, I
     }
 
     deinit {
+        broadcastTask?.cancel()
         for task in activeTasks.values {
             task.cancel()
         }

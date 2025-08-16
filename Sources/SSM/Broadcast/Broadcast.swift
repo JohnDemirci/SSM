@@ -11,10 +11,20 @@ import Foundation
 @MainActor
 final class BroadcastStudio {
     static let shared = BroadcastStudio()
-    internal let channel = AsyncChannel<any BroadcastMessage>()
 
-    func publish<M: BroadcastMessage>(_ message: M) async {
-        await channel.send(message)
+    private var continuation: AsyncStream<any BroadcastMessage>.Continuation?
+    private(set) lazy var channel: AsyncStream<any BroadcastMessage> = {
+        AsyncStream { continuation in
+            self.continuation = continuation
+        }
+    }()
+
+    func publish<M: BroadcastMessage>(_ message: M) {
+        continuation?.yield(message)
+    }
+
+    deinit {
+        continuation?.finish()
     }
 }
 

@@ -92,8 +92,15 @@ public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, I
         self.reducer = .init()
 
         self.broadcastTask = Task { [weak self] in
+            // Create a local reference to avoid repeated weak unwrapping
             guard let self else { return }
+
             for await message in BroadcastStudio.shared.channel {
+                // Check if self still exists and task isn't cancelled
+                guard !Task.isCancelled else {
+                    print("Breaking from broadcast loop - store deallocated or task cancelled")
+                    break
+                }
                 await self.reducer.didReceiveBroadcastMessage(message, in: self)
             }
         }

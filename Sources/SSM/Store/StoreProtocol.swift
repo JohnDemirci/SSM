@@ -26,7 +26,7 @@ import Foundation
 ///
 /// ## Usage
 /// Stores are typically used to encapsulate business logic, state, and side-effects, and can be composed or observed as needed.
-public protocol StoreProtocol: AnyObject, Sendable {
+public protocol StoreProtocol: AnyObject, Sendable, Equatable {
     associatedtype State
     associatedtype Request
     associatedtype Environment: Sendable
@@ -37,3 +37,8 @@ public protocol StoreProtocol: AnyObject, Sendable {
     func send(_ request: sending Request)
 }
 
+extension StoreProtocol {
+    public static func == (lhs: Self, rhs: Self) -> Bool {
+        lhs.id == rhs.id
+    }
+}

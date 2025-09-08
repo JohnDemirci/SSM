@@ -5,6 +5,7 @@
 //  Created by John Demirci on 7/27/25.
 //
 
+import Combine
 import Foundation
 import LoadableValues
 import SwiftUI
@@ -63,9 +64,8 @@ extension Store {
         keyPath: WritableKeyPath<State, T>,
         work: @Sendable @escaping (Environment) async -> sending T
     ) async {
-        let taskKey = String(describing: keyPath)
         defer {
-            activeTasks.removeValue(forKey: taskKey)
+            activeTasks.removeValue(forKey: keyPath)
         }
         let task = Task { [weak self] in
             guard let self else { return }
@@ -76,7 +76,7 @@ extension Store {
             self.set(keyPath: keyPath, value)
         }
 
-        activeTasks[taskKey] = task
+        activeTasks[keyPath] = task
         await task.value
     }
 
@@ -92,11 +92,10 @@ extension Store {
             self.set(keyPath: keyPath, transform(value))
         }
 
-        let taskKey = String(describing: keyPath)
-        activeTasks[taskKey] = task
+        activeTasks[keyPath] = task
 
         await task.value
-        activeTasks.removeValue(forKey: taskKey)
+        activeTasks.removeValue(forKey: keyPath)
     }
 
     func performSync<T>(
@@ -142,9 +141,9 @@ extension Store {
                 )
             }
         }
-        activeTasks[String(describing: keyPath)] = task
+        activeTasks[keyPath] = task
         await task.value
-        activeTasks.removeValue(forKey: String(describing: keyPath))
+        activeTasks.removeValue(forKey: keyPath)
     }
 
     func loadAsync<StateValue, ClientValue: Sendable>(
@@ -187,9 +186,9 @@ extension Store {
             }
         }
 
-        activeTasks[String(describing: keyPath)] = task
+        activeTasks[keyPath] = task
         await task.value
-        activeTasks.removeValue(forKey: String(describing: keyPath))
+        activeTasks.removeValue(forKey: keyPath)
     }
 
     func loadAsync<Key: Hashable & Sendable, Value>(
@@ -235,9 +234,11 @@ extension Store {
             }
         }
 
-        activeTasks[String(describing: keyPath) + String(describing: key)] = task
+        let taskKey = String(describing: keyPath) + String(describing: key)
+
+        activeTasks[taskKey] = task
         await task.value
-        activeTasks.removeValue(forKey: String(describing: keyPath) + String(describing: key))
+        activeTasks.removeValue(forKey: taskKey)
     }
 
     func withEnvironment<Dependency, Value>(
@@ -296,5 +297,58 @@ extension Store {
             )
         )
         #endif
+    }
+
+    func subscribe<Dependency, Result>(
+        keypath: KeyPath<Environment, Dependency>,
+        _ body: @escaping (Dependency) -> AnyPublisher<Result, Never>,
+        map: @escaping (Result) -> Request?
+    ) {
+        let model = environment[keyPath: keypath]
+        let stream = body(model)
+
+        let id = UUID()
+
+        self.subscriptionTasks[id] = Task { [weak self] in
+            for await value in stream.values {
+                guard let self else { return }
+                let request = map(value)
+
+                guard let request else { return }
+
+                Task { @MainActor in
+                    self.send(request)
+                }
+            }
+        }
+    }
+
+    func subscribe<Dependency, Result>(
+        keypath: KeyPath<Environment, Dependency>,
+        _ body: @escaping (Dependency) -> AsyncStream<Result>,
+        map: @escaping (Result) -> Request?
+    ) {
+        let model = environment[keyPath: keypath]
+        let stream = body(model)
+
+        let id = UUID()
+
+        self.subscriptionTasks[id] = Task { [weak self] in
+            for await result in stream {
+                guard let self else { return }
+                let request = map(result)
+
+                guard let request else { return }
+
+                Task { @MainActor in
+                    self.send(request)
+                }
+            }
+        }
+
+        Task { [weak self] in
+            guard let self else { return }
+            await self.subscriptionTasks[id]?.value
+        }
     }
 }

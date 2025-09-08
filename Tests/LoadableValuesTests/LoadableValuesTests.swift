@@ -272,7 +272,7 @@ struct LoadableValuesTests {
 	func zipMultipleLoadableValues() async throws {
 		let state1: LoadableValue<Int, Error> = .idle
 		let state2: LoadableValue<String, Error> = .loading
-		let zipped = zipped(state1, state2)
+		let zipped = zip(state1, state2)
 
 		switch zipped {
 		case .idle:

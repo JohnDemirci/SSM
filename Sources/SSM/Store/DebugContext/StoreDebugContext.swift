@@ -11,7 +11,7 @@ import LoadableValues
 
 @MainActor
 public struct StoreDebugContext<R: Reducer> {
-    private let store: Store<R>
+    let store: Store<R>
 
     internal init(store: Store<R>) {
         self.store = store
@@ -64,7 +64,7 @@ extension StoreDebugContext {
     public func broadcast<M: BroadcastMessage>(
         _ message: M
     ) async -> StoreDebugContext<R> {
-        await BroadcastStudio.shared.publish(message)
+        // TODO: - handle
         return self
     }
 
@@ -83,7 +83,7 @@ extension StoreDebugContext {
     public func selfOnlyBroadcast<M: BroadcastMessage>(
         _ message: M
     ) async -> StoreDebugContext<R> {
-        await self.store.reducer.didReceiveBroadcastMessage(message, in: self.store)
+        // TODO: - handle
         return self
     }
 }

@@ -8,7 +8,7 @@
 import SSM
 
 struct TestEnvironment {
-    let recipeClient: RecipeClient = .init()
+    let broadcastStudio: BroadcastStudio = .shared
 }
 
 

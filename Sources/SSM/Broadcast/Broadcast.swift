@@ -8,15 +8,30 @@
 import Combine
 import Foundation
 
-@MainActor
-final class BroadcastStudio {
-    static let shared = BroadcastStudio()
+public protocol BroadcastHubPublishable {
+    var publisher: AnyPublisher<any BroadcastMessage, Never> { get }
+}
+
+protocol BroadcastMessagePublishable {
+    @MainActor
+    func publish<M: BroadcastMessage>(_ message: M)
+}
+
+protocol Broadcasting: BroadcastHubPublishable, BroadcastMessagePublishable {}
+
+public final class BroadcastStudio: Broadcasting, Sendable {
+    public static let shared = BroadcastStudio()
+
+    private init() {}
+
+    nonisolated(unsafe)
     private let subject = PassthroughSubject<any BroadcastMessage, Never>()
 
-    internal var publisher: AnyPublisher<any BroadcastMessage, Never> {
+    public var publisher: AnyPublisher<any BroadcastMessage, Never> {
         subject.eraseToAnyPublisher()
     }
 
+    @MainActor
     func publish<M: BroadcastMessage>(_ message: M) {
         subject.send(message)
     }
@@ -42,7 +57,7 @@ final class BroadcastStudio {
 ///     let userID: String
 /// }
 /// ```
-public protocol BroadcastMessage: Sendable, Identifiable, Hashable {
-    var id: UUID { get }
+public protocol BroadcastMessage: Sendable, Identifiable {
     var name: String { get }
+    var originatingFrom: any StoreProtocol { get }
 }

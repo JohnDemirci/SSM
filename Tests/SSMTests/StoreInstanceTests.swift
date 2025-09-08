@@ -40,8 +40,13 @@ struct StoreInstanceTests {
 
         func scope() async {
             let store1 = container.recipeStore()
-            await store1.send(.fetchRecipes([.burger]))
-            #expect(store1.recipes.value == [.burger])
+            await store1.send(.fetchRecipes)
+
+            store1.testContext?.makeValueForAwaitingKeypath(for: \.recipes, .idle) {
+                #expect($0.recipes.value == nil)
+            }
+
+            //#expect(store1.recipes.value == nil)
         }
 
         await scope()

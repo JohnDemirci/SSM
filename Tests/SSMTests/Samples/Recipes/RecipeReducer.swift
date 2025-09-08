@@ -12,30 +12,26 @@ import Foundation
 struct RecipeReducer: Reducer {
     func reduce(store: SSM.Store<RecipeReducer>, request: Request) async {
         switch request {
-        case .fetchRecipes(let expectation):
+        case .fetchRecipes:
             await load(store: store, keyPath: \.recipes) {
-                try await $0.client.fetchRecipes(expectation)
+                [.burger]
             }
 
-        case .uploadRecipe(let recipe):
+        case .uploadRecipe:
             await load(store: store, keyPath: \.uploadRecipe) {
-                try await $0.client.updateRecipe(recipe)
+                EquatableVoid()
             }
         }
     }
     
     enum Request {
-        case fetchRecipes([Recipe]?)
-        case uploadRecipe(Recipe?)
+        case fetchRecipes
+        case uploadRecipe(Recipe)
     }
 
     struct State {
         var recipes: LoadableValue<[Recipe], Error> = .idle
-        var uploadRecipe: LoadableValue<Void, Error> = .idle
-    }
-
-    struct Environment: Sendable {
-        let client: RecipeClient
+        var uploadRecipe: LoadableValue<EquatableVoid, Error> = .idle
     }
 }
 
@@ -43,10 +39,7 @@ extension StoreContrainer where Environment == TestEnvironment {
     func recipeStore() -> Store<RecipeReducer> {
         store(
             type: Store<RecipeReducer>.self,
-            state: Store<RecipeReducer>.State(),
-            environmentClosure: {
-                Store<RecipeReducer>.Environment(client: $0.recipeClient)
-            }
+            state: Store<RecipeReducer>.State()
         )
     }
 }

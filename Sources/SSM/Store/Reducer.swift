@@ -8,6 +8,10 @@
 import Foundation
 import LoadableValues
 
+#if canImport(Combine)
+import Combine
+#endif
+
 /// A protocol that defines the core reducer pattern for state management.
 ///
 /// `Reducer` is the central component of the SSM (State Store Manager) architecture.
@@ -75,7 +79,7 @@ public protocol Reducer: Sendable {
     ///
     /// - Note: Defining requests as an enum encourages exhaustiveness and clarity,
     ///   making it easier to reason about all possible state transitions.
-    associatedtype Request
+    associatedtype Request = Void
 
     /// The type representing the environment dependencies for this reducer.
     ///
@@ -91,21 +95,7 @@ public protocol Reducer: Sendable {
     ///
     /// - Note: `Environment` should conform to `Sendable` to ensure safe usage in
     ///   concurrent contexts and avoid data races.
-    associatedtype Environment: Sendable
-
-    /// Handles broadcast messages received by the store.
-    ///
-    /// This method is called whenever a broadcast message conforming to `BroadcastMessage`
-    /// is received by the store. Implement this method to respond to cross-cutting events
-    /// or global notifications that may affect the state or trigger side effects in the reducer.
-    ///
-    /// - Parameters:
-    ///   - message: The broadcast message received, conforming to `BroadcastMessage`.
-    ///   - store: The store instance managing the state for this reducer.
-    ///
-    /// You can override this method in your reducer to handle specific broadcast messages.
-    /// The default implementation does nothing.
-    func didReceiveBroadcastMessage(_ message: any BroadcastMessage, in store: Store<Self>) async
+    associatedtype Environment: Sendable = Void
 
     /// The main entry point for processing requests and updating state.
     ///
@@ -124,6 +114,33 @@ public protocol Reducer: Sendable {
         request: Request
     ) async
 
+    /// Sets up subscriptions to asynchronous data sources or external dependencies.
+    ///
+    /// This method is called during store initialization to allow the reducer
+    /// to subscribe to streams, publishers, or other async sources from the environment.
+    /// Use this to react to external changes (such as notifications, timers, data updates)
+    /// and dispatch requests to update state in response.
+    ///
+    /// - Parameter store: The store instance managing the state and environment for this reducer.
+    ///
+    /// - Note: The default implementation does nothing. Override this method to set up
+    ///   subscriptions specific to the reducer's logic, such as:
+    ///   - Listening to environment publisher/stream events and sending requests
+    ///   - Registering observers or Combine subscriptions
+    ///   - Scheduling periodic tasks or timers
+    ///
+    /// Example:
+    /// ```swift
+    /// func setupSubscriptions(store: Store<Self>) {
+    ///     subscribe(store: store, keypath: \.timerService) { timerService in
+    ///         timerService.tickPublisher()
+    ///     } map: { _ in
+    ///         .timerTick
+    ///     }
+    /// }
+    /// ```
+    func setupSubscriptions(store: Store<Self>)
+
     /// Creates a new instance of the reducer.
     ///
     /// The reducer must be initializable without parameters to support
@@ -132,7 +149,7 @@ public protocol Reducer: Sendable {
 }
 
 extension Reducer {
-    public func didReceiveBroadcastMessage(_ message: any BroadcastMessage, in store: Store<Self>) async {}
+    public func setupSubscriptions(store: Store<Self>) {}
 }
 
 extension Reducer where Request == Void {
@@ -165,7 +182,13 @@ public extension Reducer {
         keyPath: WritableKeyPath<State, T>,
         work: @Sendable @escaping (Environment) async -> sending T
     ) async {
-        await store.performAsync(keyPath: keyPath, work: work)
+        if isTesting {
+#if DEBUG
+            store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
+#endif
+        } else {
+            await store.performAsync(keyPath: keyPath, work: work)
+        }
     }
 
     /// Performs asynchronous work with transformation and updates the state.
@@ -194,7 +217,13 @@ public extension Reducer {
         work: @Sendable @escaping (Environment) async -> ClientValue,
         map transform: @Sendable @escaping (ClientValue) -> StateValue
     ) async {
-        await store.performAsync(keyPath: keyPath, work: work, map: transform)
+        if isTesting {
+#if DEBUG
+            store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
+#endif
+        } else {
+            await store.performAsync(keyPath: keyPath, work: work, map: transform)
+        }
     }
 
     /// Performs synchronous work and updates the state at the specified key path.
@@ -219,7 +248,14 @@ public extension Reducer {
         keyPath: WritableKeyPath<State, T>,
         work: @Sendable @escaping (Environment) -> T
     ) {
-        store.performSync(keyPath: keyPath, work: work)
+        if isTesting {
+#if DEBUG
+            store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
+#endif
+        } else {
+            store.performSync(keyPath: keyPath, work: work)
+
+        }
     }
 
     /// Loads data asynchronously and manages the loading state.
@@ -245,7 +281,13 @@ public extension Reducer {
         keyPath: WritableKeyPath<State, LoadableValue<Value, Error>>,
         work: @Sendable @escaping (Environment) async throws -> Value
     ) async {
-        await store.loadAsync(keyPath: keyPath, work: work)
+        if isTesting {
+#if DEBUG
+            store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
+#endif
+        } else {
+            await store.loadAsync(keyPath: keyPath, work: work)
+        }
     }
 
     /// Loads data asynchronously with transformation and manages the loading state.
@@ -276,7 +318,13 @@ public extension Reducer {
         work: @Sendable @escaping (Environment) async throws -> ClientValue,
         map transform: @escaping (ClientValue) -> StateValue
     ) async {
-        await store.loadAsync(keyPath: keyPath, work: work, map: transform)
+        if isTesting {
+#if DEBUG
+            store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
+#endif
+        } else {
+            await store.loadAsync(keyPath: keyPath, work: work, map: transform)
+        }
     }
 
     /// Loads data for a specific key in a dictionary of `LoadableValue`s.
@@ -302,7 +350,13 @@ public extension Reducer {
         key: Key,
         work: @Sendable @escaping (Environment) async throws -> Value
     ) async {
-        await store.loadAsync(keyPath: keyPath, key: key, work: work)
+        if isTesting {
+#if DEBUG
+            store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
+#endif
+        } else {
+            await store.loadAsync(keyPath: keyPath, key: key, work: work)
+        }
     }
 
     /// Executes a closure with a specific dependency from the environment.
@@ -423,5 +477,79 @@ public extension Reducer {
     ///   should be handled by multiple, potentially unrelated, parts of the system.
     func broadcast<M: BroadcastMessage>(_ message: M) {
         BroadcastStudio.shared.publish(message)
+    }
+
+#if canImport(Combine)
+    /// Subscribes to a Combine publisher from a dependency and maps its output to requests.
+    ///
+    /// This method enables the reducer to listen for values emitted by an `AnyPublisher` provided by a dependency in the environment.
+    /// Each emitted `Result` value is mapped to an optional `Request`, which—if non-nil—will be sent to the reducer for state updates
+    /// or side effects. This is useful for reacting to external or asynchronous events such as notifications, data updates, or timers
+    /// published by Combine publishers.
+    ///
+    /// - Parameters:
+    ///   - store: The store instance managing the reducer's state and environment.
+    ///   - keypath: The key path to the dependency within the environment providing the publisher.
+    ///   - body: A closure that, given the dependency, returns an `AnyPublisher` whose output will be observed.
+    ///   - map: A closure that maps each value emitted by the publisher to an optional `Request`. If the closure returns a non-nil value, the request is sent to the reducer.
+    ///
+    /// - Example:
+    ///   ```swift
+    ///   subscribe(store: store, keypath: \.notificationService) { service in
+    ///       service.userDidChangePublisher
+    ///   } map: { userId in
+    ///       .userDidChange(userId)
+    ///   }
+    ///   ```
+    ///
+    /// - Note: This method is only available when the Combine framework can be imported.
+    func subscribe<Dependency, Result>(
+        store: Store<Self>,
+        keypath: KeyPath<Environment, Dependency>,
+        _ body: @escaping (Dependency) -> AnyPublisher<Result, Never>,
+        map: @escaping (Result) -> Request?
+    ) {
+        store.subscribe(
+            keypath: keypath,
+            body,
+            map: map
+        )
+    }
+#endif
+
+    /// Subscribes to an asynchronous stream from a dependency and maps its output to requests.
+    ///
+    /// This method allows the reducer to listen for events or values emitted by an `AsyncStream` provided by a dependency in the environment.
+    /// Each emitted `Result` value can be mapped to a `Request`, which will then be sent to the reducer for handling state updates or side effects.
+    ///
+    /// Use this to react to external async sources such as notifications, timers, or data feeds, enabling the reducer to handle updates as they occur.
+    ///
+    /// - Parameters:
+    ///   - store: The store instance managing the reducer's state and environment.
+    ///   - keypath: The key path to the dependency within the environment providing the async stream.
+    ///   - body: A closure that, given the dependency, returns an `AsyncStream` of results to observe.
+    ///   - map: A closure that maps each emitted result from the stream to an optional `Request`. If the closure returns a non-nil value, the request will be sent to the reducer.
+    ///
+    /// - Example:
+    ///   ```swift
+    ///   subscribe(store: store, keypath: \.timerService) { timerService in
+    ///       timerService.tickStream()
+    ///   } map: { _ in
+    ///       .timerTick
+    ///   }
+    ///   ```
+    ///
+    /// - Note: This provides a convenient way to integrate asynchronous event streams into your state management logic using Swift Concurrency.
+    func subscribe<Dependency, Result>(
+        store: Store<Self>,
+        keypath: KeyPath<Environment, Dependency>,
+        _ body: @escaping (Dependency) -> AsyncStream<Result>,
+        map: @escaping (Result) -> Request?
+    ) {
+        store.subscribe(
+            keypath: keypath,
+            body,
+            map: map
+        )
     }
 }

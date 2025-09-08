@@ -2,6 +2,7 @@ import Combine
 import Foundation
 import LoadableValues
 import SwiftUI
+import IssueReporting
 
 /// A generic, observable, main-actor-isolated store for managing application state, handling requests via a reducer, and integrating with an environment.
 ///
@@ -52,11 +53,11 @@ public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, I
 
     @ObservationIgnored
 	nonisolated(unsafe)
-    internal var activeTasks: [String: Task<Void, Never>] = [:]
+    internal var activeTasks: [AnyHashable: Task<Void, Never>] = [:]
 
     @ObservationIgnored
     nonisolated(unsafe)
-    internal var broadcastCancellable: AnyCancellable?
+    internal var subscriptionTasks: [UUID: Task<Void, Never>] = [:]
 
     /// The current feature state held by the store.
     ///
@@ -69,7 +70,11 @@ public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, I
     internal(set) public var state: State
 
     #if DEBUG
-    internal(set) public var valueChanges: [ValueChange<R>] = []
+        @ObservationIgnored
+        internal(set) public var valueChanges: [ValueChange<R>] = []
+
+        @ObservationIgnored
+        private(set) public var testContext: TestContext<R>?
     #endif
 
     /// A unique reference identifier for the store instance.
@@ -90,33 +95,17 @@ public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, I
         self.environment = environment
         self.id = id
         self.reducer = .init()
+        self.reducer.setupSubscriptions(store: self)
 
-        self.broadcastCancellable = BroadcastStudio.shared.publisher.sink(
-            receiveCompletion: { [weak self] completion in
-                guard let self else { return }
-                switch completion {
-                case .finished:
-                    self.broadcastCancellable = nil
-                case .failure(let error):
-                    #if DEBUG
-                    assertionFailure("should enver reach here")
-                    #else
-                    dump("unexpected error has been encountered")
-                    #endif
-                }
-            },
-            receiveValue: { [weak self] message in
-                guard let self else { return }
-
-                Task { @MainActor in
-                    await self.reducer.didReceiveBroadcastMessage(message, in: self)
-                }
-            }
-        )
+        #if DEBUG
+        if isTesting {
+            self.testContext = .init(context: self)
+        }
+        #endif
     }
 
     deinit {
-        broadcastCancellable = nil
+        subscriptionTasks.removeAll()
         for task in activeTasks.values {
             task.cancel()
         }
@@ -182,10 +171,9 @@ public extension Store {
     func cancelActiveTask<V>(
         for keyPath: WritableKeyPath<State, LoadableValue<V, Error>>
     ) {
-        let taskKey = String(describing: keyPath)
-        if let task = activeTasks[taskKey] {
+        if let task = activeTasks[keyPath] {
             task.cancel()
-            activeTasks.removeValue(forKey: taskKey)
+            activeTasks.removeValue(forKey: keyPath)
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.set(keyPath: keyPath, .cancelled(.now))
@@ -214,10 +202,9 @@ public extension Store {
         for keyPath: WritableKeyPath<State, [K: LoadableValue<V, Error>]>,
         key: K
     ) {
-        let taskKey = String(describing: keyPath) + String(describing: key)
-        if let task = activeTasks[taskKey] {
+        if let task = activeTasks[keyPath] {
             task.cancel()
-            activeTasks.removeValue(forKey: taskKey)
+            activeTasks.removeValue(forKey: keyPath)
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.set(keyPath: keyPath, key: key, value: .cancelled(.now))
@@ -243,10 +230,9 @@ public extension Store {
     func cancelActiveTask<T>(
         for keyPath: WritableKeyPath<State, T>
     ) {
-        let taskKey = String(describing: keyPath)
-        if let task = activeTasks[taskKey] {
+        if let task = activeTasks[keyPath] {
             task.cancel()
-            activeTasks.removeValue(forKey: taskKey)
+            activeTasks.removeValue(forKey: keyPath)
         }
     }
 }

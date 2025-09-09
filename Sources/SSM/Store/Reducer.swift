@@ -503,7 +503,7 @@ public extension Reducer {
     ///   ```
     ///
     /// - Note: This method is only available when the Combine framework can be imported.
-    func subscribe<Dependency, Result>(
+	func subscribe<Dependency, Result: Sendable>(
         store: Store<Self>,
         keypath: KeyPath<Environment, Dependency>,
         _ body: @escaping (Dependency) -> AnyPublisher<Result, Never>,
@@ -540,7 +540,7 @@ public extension Reducer {
     ///   ```
     ///
     /// - Note: This provides a convenient way to integrate asynchronous event streams into your state management logic using Swift Concurrency.
-    func subscribe<Dependency, Result>(
+	func subscribe<Dependency, Result: Sendable>(
         store: Store<Self>,
         keypath: KeyPath<Environment, Dependency>,
         _ body: @escaping (Dependency) -> AsyncStream<Result>,

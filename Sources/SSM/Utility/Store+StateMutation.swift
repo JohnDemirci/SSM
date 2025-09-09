@@ -299,7 +299,7 @@ extension Store {
         #endif
     }
 
-    func subscribe<Dependency, Result>(
+	func subscribe<Dependency, Result: Sendable>(
         keypath: KeyPath<Environment, Dependency>,
         _ body: @escaping (Dependency) -> AnyPublisher<Result, Never>,
         map: @escaping (Result) -> Request?
@@ -323,7 +323,7 @@ extension Store {
         }
     }
 
-    func subscribe<Dependency, Result>(
+	func subscribe<Dependency, Result: Sendable>(
         keypath: KeyPath<Environment, Dependency>,
         _ body: @escaping (Dependency) -> AsyncStream<Result>,
         map: @escaping (Result) -> Request?

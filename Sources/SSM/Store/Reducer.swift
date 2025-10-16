@@ -183,9 +183,11 @@ public extension Reducer {
         work: @Sendable @escaping (Environment) async -> sending T
     ) async {
         if isTesting {
-#if DEBUG
+            #if DEBUG
             store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
-#endif
+            #else
+            assertionFailure("testing should be done in DEBUG builds only")
+            #endif
         } else {
             await store.performAsync(keyPath: keyPath, work: work)
         }
@@ -218,9 +220,11 @@ public extension Reducer {
         map transform: @Sendable @escaping (ClientValue) -> StateValue
     ) async {
         if isTesting {
-#if DEBUG
+            #if DEBUG
             store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
-#endif
+            #else
+            assertionFailure("testing should be done in DEBUG builds only")
+            #endif
         } else {
             await store.performAsync(keyPath: keyPath, work: work, map: transform)
         }
@@ -249,9 +253,11 @@ public extension Reducer {
         work: @Sendable @escaping (Environment) -> T
     ) {
         if isTesting {
-#if DEBUG
+            #if DEBUG
             store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
-#endif
+            #else
+            assertionFailure("testing should be done in DEBUG builds only")
+            #endif
         } else {
             store.performSync(keyPath: keyPath, work: work)
 
@@ -282,9 +288,11 @@ public extension Reducer {
         work: @Sendable @escaping (Environment) async throws -> Value
     ) async {
         if isTesting {
-#if DEBUG
+            #if DEBUG
             store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
-#endif
+            #else
+            assertionFailure("testing should be done in DEBUG builds only")
+            #endif
         } else {
             await store.loadAsync(keyPath: keyPath, work: work)
         }
@@ -319,9 +327,11 @@ public extension Reducer {
         map transform: @escaping (ClientValue) -> StateValue
     ) async {
         if isTesting {
-#if DEBUG
+            #if DEBUG
             store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
-#endif
+            #else
+            assertionFailure("testing should be done in DEBUG builds only")
+            #endif
         } else {
             await store.loadAsync(keyPath: keyPath, work: work, map: transform)
         }
@@ -351,9 +361,11 @@ public extension Reducer {
         work: @Sendable @escaping (Environment) async throws -> Value
     ) async {
         if isTesting {
-#if DEBUG
+            #if DEBUG
             store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
-#endif
+            #else
+            assertionFailure("testing should be done in DEBUG builds only")
+            #endif
         } else {
             await store.loadAsync(keyPath: keyPath, key: key, work: work)
         }
@@ -376,6 +388,7 @@ public extension Reducer {
     ///     authService.isAuthenticated
     /// }
     /// ```
+    @inlinable
     func withEnvironment<Dependency, Value>(
         store: Store<Self>,
         keyPath: KeyPath<Environment, Dependency>,
@@ -475,6 +488,7 @@ public extension Reducer {
     ///
     /// - Important: Use broadcasts for cross-cutting concerns or global events that
     ///   should be handled by multiple, potentially unrelated, parts of the system.
+    @inlinable
     func broadcast<M: BroadcastMessage>(_ message: M) {
         BroadcastStudio.shared.publish(message)
     }

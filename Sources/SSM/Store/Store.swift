@@ -2,7 +2,6 @@ import Combine
 import Foundation
 import LoadableValues
 import SwiftUI
-import IssueReporting
 
 /// A generic, observable, main-actor-isolated store for managing application state, handling requests via a reducer, and integrating with an environment.
 ///
@@ -48,7 +47,9 @@ public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, I
     public typealias Request = R.Request
     public typealias Environment = R.Environment
 
+    @usableFromInline
     internal let environment: Environment
+    
     internal let reducer: R
 
     @ObservationIgnored

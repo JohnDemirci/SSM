@@ -64,26 +64,7 @@ extension StoreDebugContext {
     public func broadcast<M: BroadcastMessage>(
         _ message: M
     ) async -> StoreDebugContext<R> {
-        // TODO: - handle
-        return self
-    }
-
-    /// Simulates the receipt of a broadcast message by this store only, bypassing the global broadcast system.
-    ///
-    /// Use this method to directly invoke the reducer's `didReceiveBroadcastMessage(_:in:)` for the associated store,
-    /// without notifying any other stores in the application. This is useful for testing or debugging how a single store
-    /// responds to broadcast messages, without triggering side effects elsewhere.
-    ///
-    /// - Parameter message: A message conforming to `BroadcastMessage` to be delivered to the store.
-    /// - Returns: The current `StoreDebugContext` instance, allowing for method chaining.
-    ///
-    /// - Note: This method is asynchronous and does not trigger normal reducer logic for actions, but instead
-    ///   directly invokes the store's broadcast message handling path.
-    @discardableResult
-    public func selfOnlyBroadcast<M: BroadcastMessage>(
-        _ message: M
-    ) async -> StoreDebugContext<R> {
-        // TODO: - handle
+        BroadcastStudio.shared.publish(message)
         return self
     }
 }

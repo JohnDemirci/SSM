@@ -11,6 +11,7 @@ import LoadableValues
 import SwiftUI
 
 extension Store {
+    @inline(__always)
     @MainActor
     func set<T>(
         keyPath: WritableKeyPath<State, T>,
@@ -34,6 +35,7 @@ extension Store {
         #endif
     }
 
+    @inline(__always)
     @MainActor
     func set<Value, Key: Hashable>(
         keyPath: WritableKeyPath<State, [Key: LoadableValue<Value, Error>]>,
@@ -98,6 +100,7 @@ extension Store {
         activeTasks.removeValue(forKey: keyPath)
     }
 
+    @inline(__always)
     func performSync<T>(
         keyPath: WritableKeyPath<State, T>,
         work: @Sendable @escaping (Environment) -> T
@@ -277,6 +280,7 @@ extension Store {
         #endif
     }
 
+    @inline(__always)
     func modifyValue<Value>(
         _ keypath: WritableKeyPath<State, Value>,
         _ transform: @escaping (inout Value) -> Void

@@ -32,6 +32,7 @@ public final class BroadcastStudio: Broadcasting, Sendable {
     }
 
     @MainActor
+    @usableFromInline
     func publish<M: BroadcastMessage>(_ message: M) {
         subject.send(message)
     }

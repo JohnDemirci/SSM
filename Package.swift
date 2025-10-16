@@ -24,15 +24,11 @@ let package = Package(
             targets: ["LoadableValues"]
         ),
     ],
-    dependencies: [
-        .package(url: "https://github.com/pointfreeco/xctest-dynamic-overlay", from: "1.5.0"),
-    ],
     targets: [
         .target(
             name: "SSM",
             dependencies: [
                 "LoadableValues",
-                .product(name: "IssueReporting", package: "xctest-dynamic-overlay")
             ]
         ),
         .target(name: "LoadableValues"),

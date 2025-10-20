@@ -7,6 +7,8 @@
 
 import Foundation
 import os
+import Testing
+import XCTest
 
 #if DEBUG
 @MainActor
@@ -20,20 +22,33 @@ public final class TestContext<R: Reducer> {
     public init(context: Store<R>) {
         self.context = context
     }
-
+    
+    #if swift(>=6.2)
+    @MainActor
     deinit {
         if !keypathsToUpdate.isEmpty {
-            assertionFailure("Deinitializing the Test Context while items waiting to be asserted: \(keypathsToUpdate)")
+            issueFailure("Deinitializing the Test Context while items waiting to be asserted: \(keypathsToUpdate)")
         }
     }
+    #else
+    deinit {
+        let keypaths = keypathsToUpdate
+        
+        if !keypaths.isEmpty {
+            logger.fault("deinitilizing the Text Context while items waiting to be asserted: \(keypaths)")
+        }
+    }
+    #endif
 }
 
 extension TestContext {
     func setExpectationForActionOnKeyPath<T>(
         keyPath: WritableKeyPath<R.State, T>
     ) {
-        guard keypathsToUpdate.isEmpty else {
-            fatalError("Attempting to perform a test action while items are still waiting to be asserted \(keypathsToUpdate)")
+        let keypaths = keypathsToUpdate
+        guard keypaths.isEmpty else {
+            issueFailure("Attempting to perform a test action while items are still waiting to be asserted \(keypaths)")
+            return
         }
 
         keypathsToUpdate.append(keyPath)
@@ -44,23 +59,30 @@ extension TestContext {
         _ value: T,
         completion: @Sendable @escaping (Store<R>.State) -> Void
     ) {
+        let keypaths = self.keypathsToUpdate
+        
         let keypathIndex = keypathsToUpdate.firstIndex(of: keypath)
+        let keypathStringRepresentation = "\(keypath)"
 
         guard let keypathIndex else {
-            fatalError("unable to find the index of the keypath: \(keypath) inside the \(keypathsToUpdate)")
+            issueFailure("unable to find the index of the keypath: \(keypathStringRepresentation) inside the \(keypaths)")
+            return
         }
 
         let awaitingTypeErasedKeypath = keypathsToUpdate[keypathIndex]
+        let awaitingTypeErasedKeypathString = "\(awaitingTypeErasedKeypath)"
 
         guard let awaitingKeypath = awaitingTypeErasedKeypath as? WritableKeyPath<R.State, T> else {
-            fatalError("unable to convert the \(awaitingTypeErasedKeypath) to type \(WritableKeyPath<R.State, T>.self)")
+            issueFailure("unable to convert the \(awaitingTypeErasedKeypathString) to type \(WritableKeyPath<R.State, T>.self)")
+            return
         }
 
         self.context!.state[keyPath: awaitingKeypath] = value
         keypathsToUpdate.remove(at: keypathIndex)
 
         guard let store = context else {
-            fatalError("store is deallocated")
+            issueFailure("store is deallocated")
+            return
         }
 
         completion(store.state)
@@ -75,6 +97,19 @@ extension TestContext {
             keypathsToUpdate.remove(at: keypathIndex)
         } else {
             logger.fault("Attempted to remove a keypath that does not exist within the queue")
+        }
+    }
+}
+
+private extension TestContext {
+    func issueFailure(_ message: String) {
+        // TODO: - Replace it with Test.isRunning when it gets merged
+        // Note: - if the test uses Task.detatched, it will return nil
+        // https://github.com/swiftlang/swift-testing/pull/514
+        if Test.current != nil {
+            Issue.record("\(message)")
+        } else {
+            XCTFail(message)
         }
     }
 }

@@ -16,7 +16,7 @@ let package = Package(
     products: [
         .library(
             name: "SSM",
-            targets: ["SSM"]
+            targets: ["SSM"],
         ),
         .library(
             name: "LoadableValues",

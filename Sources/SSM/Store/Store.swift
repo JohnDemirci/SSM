@@ -51,6 +51,14 @@ public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, I
     internal let environment: Environment
     
     internal let reducer: R
+    
+    @ObservationIgnored
+    nonisolated(unsafe)
+    internal var activeTasksLock = NSRecursiveLock()
+    
+    @ObservationIgnored
+    nonisolated(unsafe)
+    internal var subscriptionTaskLock = NSRecursiveLock()
 
     @ObservationIgnored
 	nonisolated(unsafe)
@@ -106,11 +114,16 @@ public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, I
     }
 
     deinit {
-        subscriptionTasks.removeAll()
-        for task in activeTasks.values {
-            task.cancel()
+        subscriptionTaskLock.withLock {
+            subscriptionTasks.removeAll()
         }
-        activeTasks.removeAll()
+        
+        activeTasksLock.withLock {
+            for task in activeTasks.values {
+                task.cancel()
+            }
+            activeTasks.removeAll()
+        }
     }
 
     @inlinable
@@ -175,10 +188,7 @@ public extension Store {
         if let task = activeTasks[keyPath] {
             task.cancel()
             activeTasks.removeValue(forKey: keyPath)
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.set(keyPath: keyPath, .cancelled(.now))
-            }
+            self.set(keyPath: keyPath, .cancelled(.now))
         }
     }
 
@@ -206,10 +216,7 @@ public extension Store {
         if let task = activeTasks[keyPath] {
             task.cancel()
             activeTasks.removeValue(forKey: keyPath)
-            Task { @MainActor [weak self] in
-                guard let self else { return }
-                self.set(keyPath: keyPath, key: key, value: .cancelled(.now))
-            }
+            self.set(keyPath: keyPath, key: key, value: .cancelled(.now))
         }
     }
 
@@ -238,7 +245,7 @@ public extension Store {
     }
 }
 
-public extension Store where State: Identifiable {
+extension Store where State: Identifiable {
     /// Creates a new store with the provided initial state and environment, deriving the store's unique identity from the state's identifier.
     ///
     /// This initializer should be used when your state type conforms to `Identifiable`. The store's identity will be based on the state's `id` value, ensuring uniqueness and safe referencing in parent/child or collection scenarios.
@@ -253,7 +260,7 @@ public extension Store where State: Identifiable {
     /// ```
     /// let store = Store(initialState: MyState(id: ...), environment: MyEnvironment())
     /// ```
-    convenience init(
+    public convenience init(
         initialState: State,
         environment: Environment,
     ) {
@@ -265,7 +272,7 @@ public extension Store where State: Identifiable {
     }
 }
 
-public extension Store {
+extension Store {
     /// Creates a new store with the provided initial state and environment.
     ///
     /// This initializer is suitable for most features whose state does not conform to `Identifiable`, or where a unique store identity is not otherwise required.
@@ -280,7 +287,7 @@ public extension Store {
     /// ```
     /// let store = Store(initialState: MyState(), environment: MyEnvironment())
     /// ```
-    convenience init(
+    public convenience init(
         initialState: State,
         environment: Environment,
     ) {

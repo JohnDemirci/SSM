@@ -45,6 +45,10 @@ public final class BoxedState<R: Reducer, StoreValue, MappedValue>: @unchecked S
         self.store = store
         self.keyPath = keyPath
         self.map = map
+        
+        Task { @MainActor [weak self] in
+            self?.observe()
+        }
     }
 
     @MainActor

@@ -19,20 +19,20 @@ extension Store {
     ) {
         #if DEBUG
         let previousValue = state[keyPath: keyPath]
+        
+        defer {
+            self.valueChanges.append(
+                .init(
+                    keypath: keyPath,
+                    date: .now,
+                    previousValue: previousValue,
+                    newValue: state[keyPath: keyPath]
+                )
+            )
+        }
         #endif
 
         self.state[keyPath: keyPath] = value
-
-        #if DEBUG
-        self.valueChanges.append(
-            .init(
-                keypath: keyPath,
-                date: .now,
-                previousValue: previousValue,
-                newValue: state[keyPath: keyPath]
-            )
-        )
-        #endif
     }
 
     @inline(__always)
@@ -44,20 +44,20 @@ extension Store {
     ) {
         #if DEBUG
         let previousValue = state[keyPath: keyPath][key]
+        
+        defer {
+            self.valueChanges.append(
+                .init(
+                    keypath: keyPath,
+                    date: .now,
+                    previousValue: previousValue as Any,
+                    newValue: state[keyPath: keyPath]
+                )
+            )
+        }
         #endif
 
         self.state[keyPath: keyPath][key] = value
-
-        #if DEBUG
-        self.valueChanges.append(
-            .init(
-                keypath: keyPath,
-                date: .now,
-                previousValue: previousValue as Any,
-                newValue: state[keyPath: keyPath]
-            )
-        )
-        #endif
     }
 }
 
@@ -67,7 +67,9 @@ extension Store {
         work: @Sendable @escaping (Environment) async -> sending T
     ) async {
         defer {
-            activeTasks.removeValue(forKey: keyPath)
+            _ = activeTasksLock.withLock {
+                activeTasks.removeValue(forKey: keyPath)
+            }
         }
         let task = Task { [weak self] in
             guard let self else { return }
@@ -78,7 +80,10 @@ extension Store {
             self.set(keyPath: keyPath, value)
         }
 
-        activeTasks[keyPath] = task
+        activeTasksLock.withLock {
+            activeTasks[keyPath] = task
+        }
+        
         await task.value
     }
 
@@ -94,10 +99,15 @@ extension Store {
             self.set(keyPath: keyPath, transform(value))
         }
 
-        activeTasks[keyPath] = task
+        activeTasksLock.withLock {
+            activeTasks[keyPath] = task
+        }
 
         await task.value
-        activeTasks.removeValue(forKey: keyPath)
+        
+        _ = activeTasksLock.withLock {
+            activeTasks.removeValue(forKey: keyPath)
+        }
     }
 
     @inline(__always)
@@ -114,7 +124,7 @@ extension Store {
     ) async {
         if case .loading = state[keyPath: keyPath] {
             #if DEBUG
-                assertionFailure("Currently another operation is loading value")
+            assertionFailure("Currently another operation is loading value")
             #else
             dump("another process is currently being executed")
             #endif
@@ -144,9 +154,14 @@ extension Store {
                 )
             }
         }
-        activeTasks[keyPath] = task
+        
+        activeTasksLock.withLock {
+            activeTasks[keyPath] = task
+        }
         await task.value
-        activeTasks.removeValue(forKey: keyPath)
+        _ = activeTasksLock.withLock {
+            activeTasks.removeValue(forKey: keyPath)
+        }
     }
 
     func loadAsync<StateValue, ClientValue: Sendable>(
@@ -189,9 +204,13 @@ extension Store {
             }
         }
 
-        activeTasks[keyPath] = task
+        activeTasksLock.withLock {
+            activeTasks[keyPath] = task
+        }
         await task.value
-        activeTasks.removeValue(forKey: keyPath)
+        _ = activeTasksLock.withLock {
+            activeTasks.removeValue(forKey: keyPath)
+        }
     }
 
     func loadAsync<Key: Hashable & Sendable, Value>(
@@ -239,9 +258,15 @@ extension Store {
 
         let taskKey = String(describing: keyPath) + String(describing: key)
 
-        activeTasks[taskKey] = task
+        activeTasksLock.withLock {
+            activeTasks[taskKey] = task
+        }
+        
         await task.value
-        activeTasks.removeValue(forKey: taskKey)
+        
+        _ = activeTasksLock.withLock {
+            activeTasks.removeValue(forKey: taskKey)
+        }
     }
 
     func withEnvironment<Dependency, Value>(
@@ -264,20 +289,20 @@ extension Store {
     ) {
         #if DEBUG
         let previousValue = state[keyPath: keypath]
+        
+        defer {
+            valueChanges.append(
+                .init(
+                    keypath: keypath,
+                    date: .now,
+                    previousValue: previousValue,
+                    newValue: state[keyPath: keypath]
+                )
+            )
+        }
         #endif
 
         state[keyPath: keypath].modify(transform: transform)
-
-        #if DEBUG
-        valueChanges.append(
-            .init(
-                keypath: keypath,
-                date: .now,
-                previousValue: previousValue,
-                newValue: state[keyPath: keypath]
-            )
-        )
-        #endif
     }
 
     @inline(__always)
@@ -287,20 +312,20 @@ extension Store {
     ) {
         #if DEBUG
         let previousValue = state[keyPath: keypath]
+        
+        defer {
+            valueChanges.append(
+                .init(
+                    keypath: keypath,
+                    date: .now,
+                    previousValue: previousValue,
+                    newValue: state[keyPath: keypath]
+                )
+            )
+        }
         #endif
 
         transform(&state[keyPath: keypath])
-
-        #if DEBUG
-        valueChanges.append(
-            .init(
-                keypath: keypath,
-                date: .now,
-                previousValue: previousValue,
-                newValue: state[keyPath: keypath]
-            )
-        )
-        #endif
     }
 
 	func subscribe<Dependency, Result: Sendable>(
@@ -313,15 +338,17 @@ extension Store {
 
         let id = UUID()
 
-        self.subscriptionTasks[id] = Task { [weak self] in
-            for await value in stream.values {
-                guard let self else { return }
-                let request = map(value)
+        self.subscriptionTaskLock.withLock {
+            self.subscriptionTasks[id] = Task { [weak self] in
+                for await value in stream.values {
+                    guard let self else { return }
+                    let request = map(value)
 
-                guard let request else { return }
+                    guard let request else { continue }
 
-                Task { @MainActor in
-                    self.send(request)
+                    Task { @MainActor in
+                        self.send(request)
+                    }
                 }
             }
         }
@@ -336,16 +363,18 @@ extension Store {
         let stream = body(model)
 
         let id = UUID()
+        
+        self.subscriptionTaskLock.withLock {
+            self.subscriptionTasks[id] = Task { [weak self] in
+                for await result in stream {
+                    guard let self else { return }
+                    let request = map(result)
 
-        self.subscriptionTasks[id] = Task { [weak self] in
-            for await result in stream {
-                guard let self else { return }
-                let request = map(result)
+                    guard let request else { continue }
 
-                guard let request else { return }
-
-                Task { @MainActor in
-                    self.send(request)
+                    Task { @MainActor in
+                        self.send(request)
+                    }
                 }
             }
         }

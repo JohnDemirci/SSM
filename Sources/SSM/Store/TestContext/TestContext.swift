@@ -7,8 +7,14 @@
 
 import Foundation
 import os
+
+#if canImport(Testing)
 import Testing
+#endif
+
+#if canImport(XCTest)
 import XCTest
+#endif
 
 #if DEBUG
 @MainActor
@@ -106,11 +112,18 @@ private extension TestContext {
         // TODO: - Replace it with Test.isRunning when it gets merged
         // Note: - if the test uses Task.detatched, it will return nil
         // https://github.com/swiftlang/swift-testing/pull/514
-        if Test.current != nil {
-            Issue.record("\(message)")
-        } else {
-            XCTFail(message)
-        }
+		#if canImport(Testing)
+		if Test.current != nil {
+			Issue.record("\(message)")
+			return
+		}
+		#endif
+
+		#if canImport(XCTest)
+		if isTesting {
+			XCTFail(message)
+		}
+		#endif
     }
 }
 #endif

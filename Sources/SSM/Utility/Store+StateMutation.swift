@@ -17,21 +17,6 @@ extension Store {
         keyPath: WritableKeyPath<State, T>,
         _ value: T
     ) {
-        #if DEBUG
-        let previousValue = state[keyPath: keyPath]
-        
-        defer {
-            self.valueChanges.append(
-                .init(
-                    keypath: keyPath,
-                    date: .now,
-                    previousValue: previousValue,
-                    newValue: state[keyPath: keyPath]
-                )
-            )
-        }
-        #endif
-
         self.state[keyPath: keyPath] = value
     }
 
@@ -42,21 +27,6 @@ extension Store {
         key: Key,
         value: LoadableValue<Value, Error>
     ) {
-        #if DEBUG
-        let previousValue = state[keyPath: keyPath][key]
-        
-        defer {
-            self.valueChanges.append(
-                .init(
-                    keypath: keyPath,
-                    date: .now,
-                    previousValue: previousValue as Any,
-                    newValue: state[keyPath: keyPath]
-                )
-            )
-        }
-        #endif
-
         self.state[keyPath: keyPath][key] = value
     }
 }
@@ -287,21 +257,6 @@ extension Store {
         _ keypath: WritableKeyPath<State, LoadableValue<Value, Error>>,
         _ transform: @escaping (inout Value) -> Void
     ) {
-        #if DEBUG
-        let previousValue = state[keyPath: keypath]
-        
-        defer {
-            valueChanges.append(
-                .init(
-                    keypath: keypath,
-                    date: .now,
-                    previousValue: previousValue,
-                    newValue: state[keyPath: keypath]
-                )
-            )
-        }
-        #endif
-
         state[keyPath: keypath].modify(transform: transform)
     }
 
@@ -310,21 +265,6 @@ extension Store {
         _ keypath: WritableKeyPath<State, Value>,
         _ transform: @escaping (inout Value) -> Void
     ) {
-        #if DEBUG
-        let previousValue = state[keyPath: keypath]
-        
-        defer {
-            valueChanges.append(
-                .init(
-                    keypath: keypath,
-                    date: .now,
-                    previousValue: previousValue,
-                    newValue: state[keyPath: keypath]
-                )
-            )
-        }
-        #endif
-
         transform(&state[keyPath: keypath])
     }
 

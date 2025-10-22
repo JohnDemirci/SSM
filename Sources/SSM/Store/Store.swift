@@ -78,13 +78,10 @@ public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, I
     /// - Note: When using SwiftUI, views observing the store will automatically refresh when `state` changes.
     internal(set) public var state: State
 
-    #if DEBUG
-        @ObservationIgnored
-        internal(set) public var valueChanges: [ValueChange<R>] = []
-
-        @ObservationIgnored
-        private(set) public var testContext: TestContext<R>?
-    #endif
+	#if DEBUG
+	@ObservationIgnored
+	private(set) public var testContext: TestContext<R>?
+	#endif
 
     /// A unique reference identifier for the store instance.
     ///

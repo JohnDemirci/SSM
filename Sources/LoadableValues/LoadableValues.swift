@@ -7,6 +7,7 @@
 
 import Foundation
 import OSLog
+import os
 
 /// A type that represents the state of an asynchronous loading operation.
 ///
@@ -127,12 +128,7 @@ public extension LoadableValue {
             transform(&value)
             self = .loaded(LoadingSuccess(value: value, timestamp: success.timestamp))
         default:
-            #if DEBUG
-                assertionFailure("Cannot modify a non-loaded value")
-            #else
-                Logger(subsystem: "com.JohnDemirci.SSM", category: "LoadableValue_modify_failure")
-                    .error("Cannot modify a non-loaded value")
-            #endif
+            logger.error("Attempted to modify a non-loaded LoadableValue")
         }
     }
 }

@@ -1,5 +1,6 @@
 import Combine
 import Foundation
+import os
 import LoadableValues
 import SwiftUI
 
@@ -67,6 +68,9 @@ public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, I
     @ObservationIgnored
     nonisolated(unsafe)
     internal var subscriptionTasks: [UUID: Task<Void, Never>] = [:]
+    
+    @ObservationIgnored
+    internal let logger: Logger
 
     /// The current feature state held by the store.
     ///
@@ -77,11 +81,6 @@ public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, I
     /// - Important: For best practices, treat `state` as read-only outside of the reducer or store methods. Direct mutation is discouraged except from within the reducer logic.
     /// - Note: When using SwiftUI, views observing the store will automatically refresh when `state` changes.
     internal(set) public var state: State
-
-	#if DEBUG
-	@ObservationIgnored
-	private(set) public var testContext: TestContext<R>?
-	#endif
 
     /// A unique reference identifier for the store instance.
     ///
@@ -101,13 +100,8 @@ public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, I
         self.environment = environment
         self.id = id
         self.reducer = .init()
+        self.logger = Logger(subsystem: "SSM.Store", category: "\(R.self)_\(self.id)_Strore")
         self.reducer.setupSubscriptions(store: self)
-
-        #if DEBUG
-        if isTesting {
-            self.testContext = .init(context: self)
-        }
-        #endif
     }
 
     deinit {
@@ -295,3 +289,4 @@ extension Store {
         )
     }
 }
+

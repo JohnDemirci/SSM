@@ -184,9 +184,9 @@ public extension Reducer {
     ) async {
         if isTesting {
             #if DEBUG
-            store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
+            // handle test cases
             #else
-            assertionFailure("testing should be done in DEBUG builds only")
+            logger.fault("Testing should be done in DEBUG builds only")
             #endif
         } else {
             await store.performAsync(keyPath: keyPath, work: work)
@@ -221,9 +221,9 @@ public extension Reducer {
     ) async {
         if isTesting {
             #if DEBUG
-            store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
+            // handle test cases
             #else
-            assertionFailure("testing should be done in DEBUG builds only")
+            logger.fault("Testing should be done in DEBUG builds only")
             #endif
         } else {
             await store.performAsync(keyPath: keyPath, work: work, map: transform)
@@ -254,9 +254,9 @@ public extension Reducer {
     ) {
         if isTesting {
             #if DEBUG
-            store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
+            // handle test cases
             #else
-            assertionFailure("testing should be done in DEBUG builds only")
+            logger.fault("Testing should be done in DEBUG builds only")
             #endif
         } else {
             store.performSync(keyPath: keyPath, work: work)
@@ -289,9 +289,9 @@ public extension Reducer {
     ) async {
         if isTesting {
             #if DEBUG
-            store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
+            // handle test cases
             #else
-            assertionFailure("testing should be done in DEBUG builds only")
+            logger.fault("Testing should be done in DEBUG builds only")
             #endif
         } else {
             await store.loadAsync(keyPath: keyPath, work: work)
@@ -328,9 +328,9 @@ public extension Reducer {
     ) async {
         if isTesting {
             #if DEBUG
-            store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
+            // handle test cases
             #else
-            assertionFailure("testing should be done in DEBUG builds only")
+            logger.fault("Testing should be done in DEBUG builds only")
             #endif
         } else {
             await store.loadAsync(keyPath: keyPath, work: work, map: transform)
@@ -362,9 +362,9 @@ public extension Reducer {
     ) async {
         if isTesting {
             #if DEBUG
-            store.testContext?.setExpectationForActionOnKeyPath(keyPath: keyPath)
+            // handle test cases
             #else
-            assertionFailure("testing should be done in DEBUG builds only")
+            logger.fault("Testing should be done in DEBUG builds only")
             #endif
         } else {
             await store.loadAsync(keyPath: keyPath, key: key, work: work)

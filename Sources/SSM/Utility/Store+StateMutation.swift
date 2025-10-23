@@ -45,7 +45,10 @@ extension Store {
             guard let self else { return }
 
             let value = await work(environment)
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else {
+                logger.info("Task is cancelled for \(keyPath.debugDescription)")
+                return
+            }
 
             self.set(keyPath: keyPath, value)
         }
@@ -65,7 +68,10 @@ extension Store {
         let task = Task { [weak self] in
             guard let self else { return }
             let value = await work(self.environment)
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else {
+                logger.info("Task is cancelled for \(keyPath.debugDescription)")
+                return
+            }
             self.set(keyPath: keyPath, transform(value))
         }
 
@@ -93,11 +99,7 @@ extension Store {
         work: @Sendable @escaping (Environment) async throws -> Value
     ) async {
         if case .loading = state[keyPath: keyPath] {
-            #if DEBUG
-            assertionFailure("Currently another operation is loading value")
-            #else
-            dump("another process is currently being executed")
-            #endif
+            logger.error("Another operation is loading for \(keyPath.debugDescription)")
             return
         }
 
@@ -107,7 +109,10 @@ extension Store {
             guard let self else { return }
             do {
                 let data = try await work(self.environment)
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled else {
+                    logger.info("Task is cancelled for \(keyPath.debugDescription)")
+                    return
+                }
                 self.set(
                     keyPath: keyPath,
                     .loaded(
@@ -115,7 +120,10 @@ extension Store {
                     )
                 )
             } catch {
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled else {
+                    logger.info("Task is cancelled for \(keyPath.debugDescription)")
+                    return
+                }
                 self.set(
                     keyPath: keyPath,
                     .failed(
@@ -140,9 +148,7 @@ extension Store {
         map transform: @escaping (ClientValue) -> StateValue
     ) async {
         if case .loading = state[keyPath: keyPath] {
-            #if DEBUG
-                assertionFailure("Currently another operation is loading value")
-            #endif
+            logger.error("Another operation is loading for \(keyPath.debugDescription)")
             return
         }
 
@@ -152,18 +158,21 @@ extension Store {
             guard let self else { return }
             do {
                 let value = try await work(environment)
-                guard !Task.isCancelled else { return }
-
-                await MainActor.run {
-                    self.set(
-                        keyPath: keyPath,
-                        .loaded(
-                            LoadingSuccess(value: transform(value), timestamp: Date.now)
-                        )
-                    )
+                guard !Task.isCancelled else {
+                    logger.info("Task is cancelled for \(keyPath.debugDescription)")
+                    return
                 }
+                self.set(
+                    keyPath: keyPath,
+                    .loaded(
+                        LoadingSuccess(value: transform(value), timestamp: Date.now)
+                    )
+                )
             } catch {
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled else {
+                    logger.info("Task is cancelled for \(keyPath.debugDescription)")
+                    return
+                }
 
                 self.set(
                     keyPath: keyPath,
@@ -193,9 +202,7 @@ extension Store {
         }
 
         if case .loading = state[keyPath: keyPath][key] {
-            #if DEBUG
-                assertionFailure("Currently another operation is loading value")
-            #endif
+            logger.error("Another operation is loading for \(keyPath.debugDescription)")
             return
         }
 
@@ -204,7 +211,10 @@ extension Store {
         let task = Task { [environment] in
             do {
                 let value = try await work(environment)
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled else {
+                    logger.info("Task is cancelled for \(keyPath.debugDescription)")
+                    return
+                }
 
                 self.set(
                     keyPath: keyPath,
@@ -214,7 +224,10 @@ extension Store {
                     )
                 )
             } catch {
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled else {
+                    logger.info("Task is cancelled for \(keyPath.debugDescription)")
+                    return
+                }
 
                 self.set(
                     keyPath: keyPath,
@@ -312,8 +325,8 @@ extension Store {
 
                     guard let request else { continue }
 
-                    Task { @MainActor in
-                        self.send(request)
+                    Task { @MainActor [weak self] in
+                        self?.send(request)
                     }
                 }
             }

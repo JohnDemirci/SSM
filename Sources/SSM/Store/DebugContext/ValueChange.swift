@@ -25,5 +25,4 @@ public struct ValueChange<R: Reducer> {
         """
     }
 }
-
 #endif

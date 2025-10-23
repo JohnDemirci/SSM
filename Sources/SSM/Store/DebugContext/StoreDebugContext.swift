@@ -68,5 +68,4 @@ extension StoreDebugContext {
         return self
     }
 }
-
 #endif

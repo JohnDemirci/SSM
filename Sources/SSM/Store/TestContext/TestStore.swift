@@ -26,9 +26,8 @@ public final class TestStore<R: Reducer>: Identifiable, @preconcurrency Internal
     internal(set) public var state: State
     public let id: ReferenceIdentifier
     
-    internal var subscriptionTasks: [String: Request] = [:]
-    
     private var expectations: Queue<Expectation> = .init()
+    private var activeSubscriptions: [String: (Any) -> Request?] = [:]
     
     func environment<E, V>(_ keyPath: KeyPath<Environment, E>) -> V {
         guard let book = expectations.pop() else {
@@ -207,7 +206,10 @@ extension TestStore {
         _ body: @escaping (Dependency) -> AnyPublisher<Result, Never>,
         map: @escaping (Result) -> R.Request?
     ) where Result : Sendable {
-        <#code#>
+        activeSubscriptions[name] = { result in
+            guard let typed = result as? Result else { return nil }
+            return map(typed)
+        }
     }
     #endif
     
@@ -217,8 +219,20 @@ extension TestStore {
         _ body: @escaping (Dependency) -> AsyncStream<Result>,
         map: @escaping (Result) -> R.Request?
     ) where Result : Sendable {
-        <#code#>
+        activeSubscriptions[name] = { result in
+            guard let typed = result as? Result else { return nil }
+            return map(typed)
+        }
     }
+    
+    public func emitSubscription<T>(to subscriptionName: String, value: T) async {
+         guard let mapper = activeSubscriptions[subscriptionName] else {
+             fatalError("No subscription registered with name: \(subscriptionName)")
+         }
+         if let request = mapper(value) {
+             await send(request)
+         }
+     }
 }
 
 extension TestStore where State: Identifiable {
@@ -239,12 +253,12 @@ extension TestStore {
 
 extension TestStore {
     struct Expectation {
-        let keypath: PartialKeyPath<Environment>
+        let keypath: AnyKeyPath
         let value: Any
         let delay: TimeInterval?
         
         init(
-            keypath: PartialKeyPath<Environment>,
+            keypath: AnyKeyPath,
             value: Any,
             delay: TimeInterval?
         ) {

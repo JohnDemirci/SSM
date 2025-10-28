@@ -435,7 +435,7 @@ public extension Reducer {
             } else if let store = store as? TestStore<Self> {
                 return body(store.environment(keyPath))
             } else {
-                assertionFailure("The users can only use Store and TestStore when testing. Please issue a feature request if more needs to be done")
+                fatalError("The users can only use Store and TestStore when testing. Please issue a feature request if more needs to be done")
             }
             #endif
         } else {
@@ -473,7 +473,7 @@ public extension Reducer {
             } else if let store = store as? TestStore<Self> {
                 return await body(store.environment(keyPath))
             } else {
-                assertionFailure("The users can only use Store and TestStore when testing. Please issue a feature request if more needs to be done")
+                fatalError("The users can only use Store and TestStore when testing. Please issue a feature request if more needs to be done")
             }
             #endif
         } else {
@@ -601,6 +601,7 @@ public extension Reducer {
     /// - Note: This method is only available when the Combine framework can be imported.
 	func subscribe<Dependency, Result: Sendable, SP: StoreProtocol>(
         store: SP,
+        name: String,
         keypath: KeyPath<Environment, Dependency>,
         _ body: @escaping (Dependency) -> AnyPublisher<Result, Never>,
         map: @escaping (Result) -> Request?
@@ -609,12 +610,14 @@ public extension Reducer {
             #if DEBUG
             if let store = store as? Store<Self> {
                 store.subscribe(
+                    name: name,
                     keypath: keypath,
                     body,
                     map: map
                 )
             } else if let store = store as? TestStore<Self> {
                 store.subscribe(
+                    name: name,
                     keypath: keypath,
                     body,
                     map: map
@@ -625,6 +628,7 @@ public extension Reducer {
             #endif
         } else {
             unsafeDowncast(store, to: Store<Self>.self).subscribe(
+                name: name,
                 keypath: keypath,
                 body,
                 map: map
@@ -658,6 +662,7 @@ public extension Reducer {
     /// - Note: This provides a convenient way to integrate asynchronous event streams into your state management logic using Swift Concurrency.
 	func subscribe<Dependency, Result: Sendable, SP: StoreProtocol>(
         store: SP,
+        name: String,
         keypath: KeyPath<Environment, Dependency>,
         _ body: @escaping (Dependency) -> AsyncStream<Result>,
         map: @escaping (Result) -> Request?
@@ -666,12 +671,14 @@ public extension Reducer {
             #if DEBUG
             if let store = store as? Store<Self> {
                 store.subscribe(
+                    name: name,
                     keypath: keypath,
                     body,
                     map: map
                 )
             } else if let store = store as? TestStore<Self> {
                 store.subscribe(
+                    name: name,
                     keypath: keypath,
                     body,
                     map: map
@@ -682,6 +689,7 @@ public extension Reducer {
             #endif
         } else {
             unsafeDowncast(store, to: Store<Self>.self).subscribe(
+                name: name,
                 keypath: keypath,
                 body,
                 map: map

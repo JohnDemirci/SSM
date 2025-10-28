@@ -43,7 +43,7 @@ import SwiftUI
 @MainActor
 @dynamicMemberLookup
 @Observable
-public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, Identifiable {
+public final class Store<R: Reducer>: @preconcurrency InternalStoreProtocol, Sendable, Identifiable {
     public typealias State = R.State
     public typealias Request = R.Request
     public typealias Environment = R.Environment
@@ -67,7 +67,7 @@ public final class Store<R: Reducer>: @preconcurrency StoreProtocol, Sendable, I
 
     @ObservationIgnored
     nonisolated(unsafe)
-    internal var subscriptionTasks: [UUID: Task<Void, Never>] = [:]
+    internal var subscriptionTasks: [String: Task<Void, Never>] = [:]
     
     @ObservationIgnored
     internal let logger: Logger
@@ -289,4 +289,3 @@ extension Store {
         )
     }
 }
-

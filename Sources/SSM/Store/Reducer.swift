@@ -109,8 +109,8 @@ public protocol Reducer: Sendable {
     ///
     /// - Note: Do not call this method directly. Instead, use the store's `send(_:)` method
     /// - Important: do not call the send method directly from this method.
-    func reduce(
-        store: Store<Self>,
+    func reduce<SP: StoreProtocol>(
+        store: SP,
         request: Request
     ) async
 
@@ -139,7 +139,7 @@ public protocol Reducer: Sendable {
     ///     }
     /// }
     /// ```
-    func setupSubscriptions(store: Store<Self>)
+    func setupSubscriptions<SP>(store: SP)
 
     /// Creates a new instance of the reducer.
     ///
@@ -149,12 +149,12 @@ public protocol Reducer: Sendable {
 }
 
 extension Reducer {
-    public func setupSubscriptions(store: Store<Self>) {}
+    public func setupSubscriptions<SP: StoreProtocol>(store: SP) {}
 }
 
 extension Reducer where Request == Void {
-    public func reduce(
-        store: Store<Self>,
+    public func reduce<SP: StoreProtocol>(
+        store: SP,
         request: Request
     ) async {}
 }
@@ -177,19 +177,30 @@ public extension Reducer {
     ///     Date()
     /// }
     /// ```
-    func perform<T>(
-        store: Store<Self>,
+    func perform<T, SP: StoreProtocol>(
+        store: SP,
         keyPath: WritableKeyPath<State, T>,
         work: @Sendable @escaping (Environment) async -> sending T
     ) async {
         if isTesting {
             #if DEBUG
-            // handle test cases
-            #else
-            logger.fault("Testing should be done in DEBUG builds only")
+            // check if they are using store to unit test
+            // performance is not important in this context so we can use as
+            
+            if let store = store as? Store<Self> {
+                // the consumer of this library is using the store instance as test
+                await store.performAsync(keyPath: keyPath, work: work)
+            } else if let store = store as? TestStore<Self> {
+                // intended usecase
+                await store.performAsync(keyPath: keyPath, work: work)
+            } else {
+                assertionFailure("The users can only use Store and TestStore when testing. Please issue a feature request if more needs to be done")
+            }
             #endif
         } else {
-            await store.performAsync(keyPath: keyPath, work: work)
+            // use unsafe downcast for performance gain
+            await unsafeDowncast(store, to: Store<Self>.self)
+                .performAsync(keyPath: keyPath, work: work)
         }
     }
 
@@ -213,20 +224,25 @@ public extension Reducer {
     ///     users.count
     /// })
     /// ```
-    func perform<StateValue, ClientValue: Sendable>(
-        store: Store<Self>,
+    func perform<StateValue, ClientValue: Sendable, SP: StoreProtocol>(
+        store: SP,
         keyPath: WritableKeyPath<State, StateValue>,
         work: @Sendable @escaping (Environment) async -> ClientValue,
         map transform: @Sendable @escaping (ClientValue) -> StateValue
     ) async {
         if isTesting {
             #if DEBUG
-            // handle test cases
-            #else
-            logger.fault("Testing should be done in DEBUG builds only")
+            if let store = store as? Store<Self> {
+                await store.performAsync(keyPath: keyPath, work: work, map: transform)
+            } else if let store = store as? TestStore<Self> {
+                await store.performAsync(keyPath: keyPath, work: work, map: transform)
+            } else {
+                assertionFailure("The users can only use Store and TestStore when testing. Please issue a feature request if more needs to be done")
+            }
             #endif
         } else {
-            await store.performAsync(keyPath: keyPath, work: work, map: transform)
+            await unsafeDowncast(store, to: Store<Self>.self)
+                .performAsync(keyPath: keyPath, work: work, map: transform)
         }
     }
 
@@ -247,20 +263,24 @@ public extension Reducer {
     ///     env.configurationProvider.currentConfig
     /// }
     /// ```
-    func perform<T>(
-        store: Store<Self>,
+    func perform<T, SP: StoreProtocol>(
+        store: SP,
         keyPath: WritableKeyPath<State, T>,
         work: @Sendable @escaping (Environment) -> T
     ) {
         if isTesting {
             #if DEBUG
-            // handle test cases
-            #else
-            logger.fault("Testing should be done in DEBUG builds only")
+            if let store = store as? Store<Self> {
+                store.performSync(keyPath: keyPath, work: work)
+            } else if let store = store as? TestStore<Self> {
+                store.performSync(keyPath: keyPath, work: work)
+            } else {
+                assertionFailure("The users can only use Store and TestStore when testing. Please issue a feature request if more needs to be done")
+            }
             #endif
         } else {
-            store.performSync(keyPath: keyPath, work: work)
-
+            unsafeDowncast(store, to: Store<Self>.self)
+                .performSync(keyPath: keyPath, work: work)
         }
     }
 
@@ -282,19 +302,24 @@ public extension Reducer {
     ///     try await env.userService.fetchProfile()
     /// }
     /// ```
-    func load<Value>(
-        store: Store<Self>,
+    func load<Value, SP: StoreProtocol>(
+        store: SP,
         keyPath: WritableKeyPath<State, LoadableValue<Value, Error>>,
         work: @Sendable @escaping (Environment) async throws -> Value
     ) async {
         if isTesting {
             #if DEBUG
-            // handle test cases
-            #else
-            logger.fault("Testing should be done in DEBUG builds only")
+            if let store = store as? Store<Self> {
+                await store.loadAsync(keyPath: keyPath, work: work)
+            } else if let store = store as? TestStore<Self> {
+                await store.loadAsync(keyPath: keyPath, work: work)
+            } else {
+                assertionFailure("The users can only use Store and TestStore when testing. Please issue a feature request if more needs to be done")
+            }
             #endif
         } else {
-            await store.loadAsync(keyPath: keyPath, work: work)
+            await unsafeDowncast(store, to: Store<Self>.self)
+                .loadAsync(keyPath: keyPath, work: work)
         }
     }
 
@@ -320,20 +345,25 @@ public extension Reducer {
     ///     UserSummary(name: profile.name, email: profile.email)
     /// })
     /// ```
-    func load<StateValue, ClientValue: Sendable>(
-        store: Store<Self>,
+    func load<StateValue, ClientValue: Sendable, SP: StoreProtocol>(
+        store: SP,
         keyPath: WritableKeyPath<State, LoadableValue<StateValue, Error>>,
         work: @Sendable @escaping (Environment) async throws -> ClientValue,
         map transform: @escaping (ClientValue) -> StateValue
     ) async {
         if isTesting {
             #if DEBUG
-            // handle test cases
-            #else
-            logger.fault("Testing should be done in DEBUG builds only")
+            if let store = store as? Store<Self> {
+                await store.loadAsync(keyPath: keyPath, work: work, map: transform)
+            } else if let store = store as? TestStore<Self> {
+                await store.loadAsync(keyPath: keyPath, work: work, map: transform)
+            } else {
+                assertionFailure("The users can only use Store and TestStore when testing. Please issue a feature request if more needs to be done")
+            }
             #endif
         } else {
-            await store.loadAsync(keyPath: keyPath, work: work, map: transform)
+            await unsafeDowncast(store, to: Store<Self>.self)
+                .loadAsync(keyPath: keyPath, work: work, map: transform)
         }
     }
 
@@ -354,20 +384,25 @@ public extension Reducer {
     ///     try await env.userService.fetchProfile(for: userId)
     /// }
     /// ```
-    func load<Key: Hashable & Sendable, Value>(
-        store: Store<Self>,
+    func load<Key: Hashable & Sendable, Value, SP: StoreProtocol>(
+        store: SP,
         keyPath: WritableKeyPath<State, [Key: LoadableValue<Value, Error>]>,
         key: Key,
         work: @Sendable @escaping (Environment) async throws -> Value
     ) async {
         if isTesting {
             #if DEBUG
-            // handle test cases
-            #else
-            logger.fault("Testing should be done in DEBUG builds only")
+            if let store = store as? Store<Self> {
+                await store.loadAsync(keyPath: keyPath, key: key, work: work)
+            } else if let store = store as? TestStore<Self> {
+                await store.loadAsync(keyPath: keyPath, key: key, work: work)
+            } else {
+                assertionFailure("The users can only use Store and TestStore when testing. Please issue a feature request if more needs to be done")
+            }
             #endif
         } else {
-            await store.loadAsync(keyPath: keyPath, key: key, work: work)
+            await unsafeDowncast(store, to: Store<Self>.self)
+                .loadAsync(keyPath: keyPath, key: key, work: work)
         }
     }
 
@@ -388,13 +423,24 @@ public extension Reducer {
     ///     authService.isAuthenticated
     /// }
     /// ```
-    @inlinable
-    func withEnvironment<Dependency, Value>(
-        store: Store<Self>,
+    func withEnvironment<Dependency, Value, SP: StoreProtocol>(
+        store: SP,
         keyPath: KeyPath<Environment, Dependency>,
         _ body: @escaping (Dependency) -> Value
     ) -> Value {
-        return body(store.environment[keyPath: keyPath])
+        if isTesting {
+            #if DEBUG
+            if let store = store as? Store<Self> {
+                return body(store.environment[keyPath: keyPath])
+            } else if let store = store as? TestStore<Self> {
+                return body(store.environment(keyPath))
+            } else {
+                assertionFailure("The users can only use Store and TestStore when testing. Please issue a feature request if more needs to be done")
+            }
+            #endif
+        } else {
+            return body(unsafeDowncast(store, to: Store<Self>.self).environment[keyPath: keyPath])
+        }
     }
 
     /// Executes an asynchronous closure with a specific dependency from the environment.
@@ -415,12 +461,24 @@ public extension Reducer {
     ///     try await userService.getCurrentUser()
     /// }
     /// ```
-    func withEnvironment<Dependency: Sendable, Value>(
-        store: Store<Self>,
+    func withEnvironment<Dependency: Sendable, Value, SP: StoreProtocol>(
+        store: SP,
         keyPath: KeyPath<Environment, Dependency>,
         _ body: @escaping (Dependency) async -> sending Value
     ) async -> Value {
-        return await body(store.environment[keyPath: keyPath])
+        if isTesting {
+            #if DEBUG
+            if let store = store as? Store<Self> {
+                return await body(store.environment[keyPath: keyPath])
+            } else if let store = store as? TestStore<Self> {
+                return await body(store.environment(keyPath))
+            } else {
+                assertionFailure("The users can only use Store and TestStore when testing. Please issue a feature request if more needs to be done")
+            }
+            #endif
+        } else {
+            return await body(unsafeDowncast(store, to: Store<Self>.self).environment[keyPath: keyPath])
+        }
     }
 
     /// Modifies the value inside a `LoadableValue` if it's in the loaded state.
@@ -440,12 +498,24 @@ public extension Reducer {
     ///     profile.lastActiveDate = Date()
     /// }
     /// ```
-    func modifyLoadedValue<Value>(
-        store: Store<Self>,
+    func modifyLoadedValue<Value, SP: StoreProtocol>(
+        store: SP,
         _ keypath: WritableKeyPath<State, LoadableValue<Value, Error>>,
         _ transform: @escaping (inout Value) -> Void
     ) {
-        store.state[keyPath: keypath].modify(transform: transform)
+        if isTesting {
+            #if DEBUG
+            if let store = store as? Store<Self> {
+                store.state[keyPath: keypath].modify(transform: transform)
+            } else if let store = store as? TestStore<Self> {
+                store.state[keyPath: keypath].modify(transform: transform)
+            } else {
+                assertionFailure("The users can only use Store and TestStore when testing. Please issue a feature request if more needs to be done")
+            }
+            #endif
+        } else {
+            unsafeDowncast(store, to: Store<Self>.self).state[keyPath: keypath].modify(transform: transform)
+        }
     }
 
     /// Modifies a value in the state using an in-place transformation.
@@ -465,12 +535,24 @@ public extension Reducer {
     ///     settings.darkMode.toggle()
     /// }
     /// ```
-    func modifyValue<Value>(
-        store: Store<Self>,
+    func modifyValue<Value, SP: StoreProtocol>(
+        store: SP,
         _ keypath: WritableKeyPath<State, Value>,
         _ transform: @escaping (inout Value) -> Void
     ) {
-        transform(&store.state[keyPath: keypath])
+        if isTesting {
+            #if DEBUG
+            if let store = store as? Store<Self> {
+                transform(&store.state[keyPath: keypath])
+            } else if let store = store as? TestStore<Self> {
+                transform(&store.state[keyPath: keypath])
+            } else {
+                assertionFailure("The users can only use Store and TestStore when testing. Please issue a feature request if more needs to be done")
+            }
+            #endif
+        } else {
+            transform(&unsafeDowncast(store, to: Store<Self>.self).state[keyPath: keypath])
+        }
     }
 
     /// Broadcasts a message to all interested subscribers in the system.
@@ -517,17 +599,37 @@ public extension Reducer {
     ///   ```
     ///
     /// - Note: This method is only available when the Combine framework can be imported.
-	func subscribe<Dependency, Result: Sendable>(
-        store: Store<Self>,
+	func subscribe<Dependency, Result: Sendable, SP: StoreProtocol>(
+        store: SP,
         keypath: KeyPath<Environment, Dependency>,
         _ body: @escaping (Dependency) -> AnyPublisher<Result, Never>,
         map: @escaping (Result) -> Request?
     ) {
-        store.subscribe(
-            keypath: keypath,
-            body,
-            map: map
-        )
+        if isTesting {
+            #if DEBUG
+            if let store = store as? Store<Self> {
+                store.subscribe(
+                    keypath: keypath,
+                    body,
+                    map: map
+                )
+            } else if let store = store as? TestStore<Self> {
+                store.subscribe(
+                    keypath: keypath,
+                    body,
+                    map: map
+                )
+            } else {
+                assertionFailure("The users can only use Store and TestStore when testing. Please issue a feature request if more needs to be done")
+            }
+            #endif
+        } else {
+            unsafeDowncast(store, to: Store<Self>.self).subscribe(
+                keypath: keypath,
+                body,
+                map: map
+            )
+        }
     }
 #endif
 
@@ -554,16 +656,36 @@ public extension Reducer {
     ///   ```
     ///
     /// - Note: This provides a convenient way to integrate asynchronous event streams into your state management logic using Swift Concurrency.
-	func subscribe<Dependency, Result: Sendable>(
-        store: Store<Self>,
+	func subscribe<Dependency, Result: Sendable, SP: StoreProtocol>(
+        store: SP,
         keypath: KeyPath<Environment, Dependency>,
         _ body: @escaping (Dependency) -> AsyncStream<Result>,
         map: @escaping (Result) -> Request?
     ) {
-        store.subscribe(
-            keypath: keypath,
-            body,
-            map: map
-        )
+        if isTesting {
+            #if DEBUG
+            if let store = store as? Store<Self> {
+                store.subscribe(
+                    keypath: keypath,
+                    body,
+                    map: map
+                )
+            } else if let store = store as? TestStore<Self> {
+                store.subscribe(
+                    keypath: keypath,
+                    body,
+                    map: map
+                )
+            } else {
+                assertionFailure("The users can only use Store and TestStore when testing. Please issue a feature request if more needs to be done")
+            }
+            #endif
+        } else {
+            unsafeDowncast(store, to: Store<Self>.self).subscribe(
+                keypath: keypath,
+                body,
+                map: map
+            )
+        }
     }
 }

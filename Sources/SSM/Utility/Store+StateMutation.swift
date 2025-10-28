@@ -282,6 +282,7 @@ extension Store {
     }
 
 	func subscribe<Dependency, Result: Sendable>(
+        name: String,
         keypath: KeyPath<Environment, Dependency>,
         _ body: @escaping (Dependency) -> AnyPublisher<Result, Never>,
         map: @escaping (Result) -> Request?
@@ -289,10 +290,8 @@ extension Store {
         let model = environment[keyPath: keypath]
         let stream = body(model)
 
-        let id = UUID()
-
         self.subscriptionTaskLock.withLock {
-            self.subscriptionTasks[id] = Task { [weak self] in
+            self.subscriptionTasks[name] = Task { [weak self] in
                 for await value in stream.values {
                     guard let self else { return }
                     let request = map(value)
@@ -305,20 +304,24 @@ extension Store {
                 }
             }
         }
+        
+        Task { [weak self] in
+            guard let self else { return }
+            await self.subscriptionTasks[name]?.value
+        }
     }
 
 	func subscribe<Dependency, Result: Sendable>(
+        name: String,
         keypath: KeyPath<Environment, Dependency>,
         _ body: @escaping (Dependency) -> AsyncStream<Result>,
         map: @escaping (Result) -> Request?
     ) {
-        let model = environment[keyPath: keypath]
-        let stream = body(model)
-
-        let id = UUID()
+        let client = environment[keyPath: keypath]
+        let stream = body(client)
         
         self.subscriptionTaskLock.withLock {
-            self.subscriptionTasks[id] = Task { [weak self] in
+            self.subscriptionTasks[name] = Task { [weak self] in
                 for await result in stream {
                     guard let self else { return }
                     let request = map(result)
@@ -334,7 +337,7 @@ extension Store {
 
         Task { [weak self] in
             guard let self else { return }
-            await self.subscriptionTasks[id]?.value
+            await self.subscriptionTasks[name]?.value
         }
     }
 }

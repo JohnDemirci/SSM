@@ -79,6 +79,23 @@ public final class TestStore<R: Reducer>: Identifiable, @preconcurrency Internal
     public func send(_ request: sending R.Request) {
         Task { await reducer.reduce(store: self, request: request) }
     }
+    
+    @MainActor
+    deinit {
+        if !expectations.isEmpty {
+            while let expectation = expectations.pop() {
+                logger.fault("Keypath in the expectation not addressed \(expectation.keypath.debugDescription)")
+            }
+            fatalError("")
+        }
+        
+        if !activeSubscriptions.isEmpty {
+            for key in activeSubscriptions.keys {
+                logger.fault("subscriptions need to be emited and tested")
+            }
+            fatalError()
+        }
+    }
 }
 
 extension TestStore {
@@ -224,15 +241,31 @@ extension TestStore {
             return map(typed)
         }
     }
-    
-    public func emitSubscription<T>(to subscriptionName: String, value: T) async {
-         guard let mapper = activeSubscriptions[subscriptionName] else {
-             fatalError("No subscription registered with name: \(subscriptionName)")
+}
+
+extension TestStore {
+    public func expect<T>(subscription: String, withValue value: T) async {
+         guard let mapper = activeSubscriptions[subscription] else {
+             fatalError("No subscription registered with name: \(subscription)")
          }
          if let request = mapper(value) {
              await send(request)
          }
      }
+    
+    public func expect<V>(
+        for keyPath: WritableKeyPath<R.State, V>,
+        withValue value: V,
+        delay: TimeInterval? = nil
+    ) {
+        self.expectations.append(
+            Expectation(
+                keypath: keyPath,
+                value: value,
+                delay: delay
+            )
+        )
+    }
 }
 
 extension TestStore where State: Identifiable {
@@ -280,6 +313,10 @@ struct Queue<Element>: Sequence {
     mutating func pop() -> Element? {
         if storage.isEmpty { return nil }
         return storage.removeFirst()
+    }
+    
+    var isEmpty: Bool {
+        storage.isEmpty
     }
     
     func makeIterator() -> some IteratorProtocol {

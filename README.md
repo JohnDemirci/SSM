@@ -9,14 +9,14 @@ A Swift package for predictable state management using the reducer pattern, desi
 Add SSM to your project using Xcode:
 
 1. File → Add Package Dependencies
-2. Enter the repository URL: `https://github.com/your-username/SSM`
+2. Enter the repository URL: `https://github.com/JohnDemirci/SSM.git`
 3. Choose the version and add to your target
 
 Or add to your `Package.swift`:
 
 ```swift
 dependencies: [
-    .package(url: "https://github.com/your-username/SSM", from: "1.0.0")
+    .package(url: "https://github.com/your-username/SSM", branch: "master")
 ]
 ```
 
@@ -32,7 +32,6 @@ dependencies: [
 
 SSM provides two main libraries:
 - **SSM**: Core state management with stores and reducers
-- **LoadableValues**: Async state management utilities
 
 ## How to Create a Reducer
 
@@ -657,5 +656,3 @@ Check the `Tests/SSMTests/Samples/` directory for complete examples including:
 - `NavigationReducer`: Example of navigation state handling
 
 ## License
-
-[Add your license information here]
